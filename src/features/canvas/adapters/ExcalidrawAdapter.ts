@@ -2,6 +2,7 @@ import {
   CaptureUpdateAction,
   getCommonBounds,
   getSceneVersion,
+  newElementWith,
   restore,
   zoomToFitBounds,
 } from '@excalidraw/excalidraw';
@@ -20,10 +21,12 @@ import type {
   CanvasScene,
   CanvasSnapshot,
   CanvasTool,
+  ElementStyleUpdate,
   SelectedElement,
 } from '../types/canvas';
 import { fromExcalidrawTool, toExcalidrawTool } from './toolMapping';
 import { normalizeElement } from './normalizeElement';
+import { toElementUpdates } from './styleUpdate';
 import { clampZoom, zoomToViewportCenter } from './zoom';
 
 type Elements = readonly ExcalidrawElement[];
@@ -190,12 +193,71 @@ export class ExcalidrawAdapter implements CanvasEngine {
     return this.host.getSnapshot().selectedElements;
   }
 
+  selectAll(): void {
+    this.dispatchShortcut('a', 'KeyA', { ctrl: true });
+  }
+
+  /**
+   * Delete the selection deterministically by committing a scene without the
+   * selected elements. This avoids the focus-sensitive Delete-key handler.
+   * Note: selection is intentionally NOT cleared in the same `updateScene` call —
+   * combining an appState selection reset with element removal prevents Excalidraw
+   * from reconciling the deletion. Removing the elements drops their selection
+   * naturally.
+   */
   deleteSelected(): void {
-    this.dispatchShortcut('Delete', 'Delete');
+    if (!this.api) return;
+    const selectedIds = this.selectedIdSet();
+    if (selectedIds.size === 0) return;
+    const remaining = this.api
+      .getSceneElements()
+      .filter((element) => !selectedIds.has(element.id));
+    this.api.updateScene({
+      elements: remaining,
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
+  }
+
+  /** Current selection read from Excalidraw (the source of truth). */
+  private selectedIdSet(): Set<string> {
+    if (!this.api) return new Set();
+    const map = this.api.getAppState().selectedElementIds;
+    return new Set(Object.keys(map).filter((id) => map[id]));
   }
 
   duplicateSelected(): void {
     this.dispatchShortcut('d', 'KeyD', { ctrl: true });
+  }
+
+  groupSelected(): void {
+    this.dispatchShortcut('g', 'KeyG', { ctrl: true });
+  }
+
+  ungroupSelected(): void {
+    this.dispatchShortcut('g', 'KeyG', { ctrl: true, shift: true });
+  }
+
+  /**
+   * Apply a style/geometry update to every selected element and commit it as an
+   * undoable change. `newElementWith` bumps element versions so Excalidraw
+   * reconciles the scene; per-element type filtering happens in
+   * {@link toElementUpdates}.
+   */
+  updateSelected(update: ElementStyleUpdate): void {
+    if (!this.api) return;
+    const selectedIds = this.selectedIdSet();
+    if (selectedIds.size === 0) return;
+
+    const next = this.api.getSceneElements().map((element) =>
+      selectedIds.has(element.id)
+        ? // `as never`: updates are validated per element type in toElementUpdates.
+          newElementWith(element, toElementUpdates(element, update) as never)
+        : element,
+    );
+    this.api.updateScene({
+      elements: next,
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    });
   }
 
   // ── History ──────────────────────────────────────────────────────────────
@@ -272,6 +334,16 @@ export class ExcalidrawAdapter implements CanvasEngine {
   getTool(): CanvasTool {
     if (!this.api) return 'selection';
     return fromExcalidrawTool(this.api.getAppState().activeTool.type);
+  }
+
+  setGrid(enabled: boolean): void {
+    // Grid rendering is driven by a prop the Canvas host reads from the store,
+    // so toggling grid is purely a state change — no imperative Excalidraw call.
+    this.host.patch({ gridEnabled: enabled });
+  }
+
+  toggleGrid(): void {
+    this.setGrid(!this.host.getSnapshot().gridEnabled);
   }
 
   // ── Internals ────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { LogOut, Settings, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,9 +45,11 @@ export function UserMenu() {
           <User />
           Profile
         </DropdownMenuItem>
-        <DropdownMenuItem disabled>
-          <Settings />
-          Settings
+        <DropdownMenuItem asChild>
+          <Link to="/settings">
+            <Settings />
+            Settings
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>

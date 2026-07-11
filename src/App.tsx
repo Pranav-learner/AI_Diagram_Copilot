@@ -1,11 +1,16 @@
 import { RouterProvider } from 'react-router-dom';
 import { AppProviders, router } from '@/app';
+import { RootErrorBoundary } from '@/app/RootErrorBoundary';
+import { OfflineBanner } from '@/components/common';
 
 export function App() {
   return (
-    <AppProviders>
-      <RouterProvider router={router} />
-    </AppProviders>
+    <RootErrorBoundary>
+      <AppProviders>
+        <OfflineBanner />
+        <RouterProvider router={router} />
+      </AppProviders>
+    </RootErrorBoundary>
   );
 }
 

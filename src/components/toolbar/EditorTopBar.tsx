@@ -13,6 +13,7 @@ import {
 import {
   Logo,
   SaveStatusIndicator,
+  ShortcutsDialog,
   ThemeToggle,
   UserMenu,
 } from '@/components/common';
@@ -102,6 +103,9 @@ export function EditorTopBar({ project, isLoading }: EditorTopBarProps) {
       )}
 
       <div className="ml-auto flex items-center gap-0.5">
+        <div className="hidden sm:block">
+          <ShortcutsDialog />
+        </div>
         <ComingSoonAction label="Share" icon={Share2} />
         <Separator orientation="vertical" className="mx-1 h-6" />
         <ThemeToggle />

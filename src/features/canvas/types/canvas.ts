@@ -19,6 +19,18 @@ export type CanvasTool =
   | 'text'
   | 'image';
 
+/** Text horizontal alignment. */
+export type TextAlign = 'left' | 'center' | 'right';
+
+/** Arrowhead styles the inspector can set (a curated subset). */
+export type ArrowheadStyle =
+  | 'none'
+  | 'arrow'
+  | 'triangle'
+  | 'dot'
+  | 'bar'
+  | 'diamond';
+
 /** Normalized element kind surfaced to the inspector. */
 export type CanvasElementType =
   | 'rectangle'
@@ -51,8 +63,54 @@ export interface SelectedElement {
   backgroundColor: string;
   /** Opacity as a percentage (0–100). */
   opacity: number;
+  /** Stroke thickness in px. */
+  strokeWidth: number;
+  /** Whether the element has rounded corners. */
+  rounded: boolean;
   /** 1-based paint order (higher = in front). */
   layer: number;
+
+  // Text-only (undefined for non-text elements)
+  text?: string;
+  fontSize?: number;
+  fontFamily?: number;
+  textAlign?: TextAlign;
+
+  // Linear/arrow-only
+  startArrowhead?: ArrowheadStyle;
+  endArrowhead?: ArrowheadStyle;
+}
+
+/**
+ * A partial style/geometry update applied to the current selection through
+ * {@link CanvasEngine.updateSelected}. Only the fields relevant to each selected
+ * element's type are applied; the rest are ignored.
+ */
+export interface ElementStyleUpdate {
+  strokeColor?: string;
+  backgroundColor?: string;
+  /** Opacity as a percentage (0–100). */
+  opacity?: number;
+  strokeWidth?: number;
+  rounded?: boolean;
+
+  // Text
+  text?: string;
+  fontSize?: number;
+  fontFamily?: number;
+  textAlign?: TextAlign;
+
+  // Arrow / line
+  startArrowhead?: ArrowheadStyle;
+  endArrowhead?: ArrowheadStyle;
+
+  // Geometry
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  /** Rotation in degrees (0–360). */
+  rotation?: number;
 }
 
 /**
@@ -75,6 +133,8 @@ export interface CanvasSnapshot {
   /** Non-null when the canvas failed to initialize or errored fatally. */
   error: string | null;
   activeTool: CanvasTool;
+  /** Whether the background grid is shown. */
+  gridEnabled: boolean;
   /** Zoom as a ratio (1 = 100%). */
   zoom: number;
   /** Count of non-deleted elements in the scene. */
@@ -94,6 +154,7 @@ export const INITIAL_SNAPSHOT: CanvasSnapshot = {
   isReady: false,
   error: null,
   activeTool: 'selection',
+  gridEnabled: false,
   zoom: 1,
   elementCount: 0,
   selectedElementIds: [],

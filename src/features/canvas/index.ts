@@ -13,6 +13,8 @@ export { useCanvas } from './hooks/useCanvas';
 // Reactive state selectors
 export {
   useActiveTool,
+  useGridEnabled,
+  useSelectionCount,
   useSceneVersion,
   useCanvasReady,
   useCanvasError,
@@ -43,6 +45,9 @@ export type {
   CanvasTool,
   CanvasElementType,
   SelectedElement,
+  ElementStyleUpdate,
+  ArrowheadStyle,
+  TextAlign,
   CanvasScene,
   CanvasSnapshot,
 } from './types/canvas';

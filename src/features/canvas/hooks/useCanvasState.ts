@@ -12,6 +12,15 @@ export function useActiveTool(): CanvasTool {
   return useCanvasStore((s) => s.activeTool);
 }
 
+export function useGridEnabled(): boolean {
+  return useCanvasStore((s) => s.gridEnabled);
+}
+
+/** Number of currently selected elements. */
+export function useSelectionCount(): number {
+  return useCanvasStore((s) => s.selectedElementIds.length);
+}
+
 /** Scene version — changes whenever the diagram's elements change. */
 export function useSceneVersion(): number {
   return useCanvasStore((s) => s.sceneVersion);

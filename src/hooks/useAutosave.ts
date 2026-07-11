@@ -6,7 +6,7 @@ import {
   useSceneVersion,
 } from '@/features/canvas';
 import { ApiError, diagramApi } from '@/services';
-import { useAutosaveStore } from '@/store';
+import { useAutosaveStore, useSettingsStore } from '@/store';
 import { useSaveDiagram } from './useDiagram';
 
 const DEBOUNCE_MS = 1200;
@@ -35,6 +35,7 @@ export function useAutosave({
   const sceneVersion = useSceneVersion();
   const saveMutation = useSaveDiagram();
   const setStatus = useAutosaveStore((s) => s.set);
+  const autosaveEnabled = useSettingsStore((s) => s.autosaveEnabled);
 
   const latestVersion = useRef(sceneVersion);
   const savedVersion = useRef<number | null>(null);
@@ -128,10 +129,11 @@ export function useAutosave({
 
   // Debounce a save whenever the scene diverges from what's saved.
   useEffect(() => {
+    if (!autosaveEnabled) return;
     if (!isReady || savedVersion.current === null) return;
     if (sceneVersion === savedVersion.current) return;
     scheduleDebounced();
-  }, [sceneVersion, isReady, scheduleDebounced]);
+  }, [sceneVersion, isReady, autosaveEnabled, scheduleDebounced]);
 
   // Flush a pending save as soon as connectivity returns.
   useEffect(() => {

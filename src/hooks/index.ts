@@ -17,3 +17,4 @@ export {
   type SaveDiagramArgs,
 } from './useDiagram';
 export { useAutosave } from './useAutosave';
+export { useOnlineStatus } from './useOnlineStatus';

@@ -5,6 +5,7 @@ export { Label } from './label';
 export { Badge, badgeVariants, type BadgeProps } from './badge';
 export { Separator } from './separator';
 export { Skeleton } from './skeleton';
+export { Switch } from './switch';
 export { ToggleGroup, ToggleGroupItem } from './toggle-group';
 export {
   Dialog,

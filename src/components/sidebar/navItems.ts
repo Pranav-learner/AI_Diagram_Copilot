@@ -32,5 +32,5 @@ export const PRIMARY_NAV: readonly SidebarNavItem[] = [
 
 /** Secondary navigation pinned to the bottom of the sidebar. */
 export const SECONDARY_NAV: readonly SidebarNavItem[] = [
-  { id: 'settings', label: 'Settings', icon: Settings, disabled: true },
+  { id: 'settings', label: 'Settings', icon: Settings, to: '/settings' },
 ];

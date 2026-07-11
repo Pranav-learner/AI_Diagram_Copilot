@@ -2,6 +2,8 @@ import { memo, type ComponentType } from 'react';
 import {
   Circle,
   Diamond,
+  Download,
+  Grid3x3,
   Hand,
   Image as ImageIcon,
   Maximize,
@@ -30,6 +32,7 @@ import {
   useCanvasHistory,
   useCanvasReady,
   useCanvasStatus,
+  useGridEnabled,
 } from '../hooks/useCanvasState';
 import type { CanvasTool } from '../types/canvas';
 
@@ -56,40 +59,46 @@ const TOOLS: readonly ToolDef[] = [
 interface IconButtonProps {
   label: string;
   icon: ComponentType<{ className?: string }>;
-  onClick: () => void;
+  onClick?: () => void;
   active?: boolean;
   disabled?: boolean;
   shortcut?: string;
+  /** Renders as a disabled "coming soon" placeholder. */
+  comingSoon?: boolean;
 }
 
-/** A single toolbar button with tooltip and pressed state. */
-const IconButton = memo(function IconButton({
+/** A single toolbar button with tooltip, shortcut hint, and pressed state. */
+export const IconButton = memo(function IconButton({
   label,
   icon: Icon,
   onClick,
   active = false,
   disabled = false,
   shortcut,
+  comingSoon = false,
 }: IconButtonProps) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
-          type="button"
-          size="icon-sm"
-          variant={active ? 'default' : 'ghost'}
-          aria-label={label}
-          aria-pressed={active}
-          disabled={disabled}
-          onClick={onClick}
-          className={cn(!active && 'text-foreground/70')}
-        >
-          <Icon className="size-4" />
-        </Button>
+        {/* Wrapper keeps the tooltip working even when the button is disabled. */}
+        <span className="inline-flex">
+          <Button
+            type="button"
+            size="icon-sm"
+            variant={active ? 'default' : 'ghost'}
+            aria-label={label}
+            aria-pressed={active}
+            disabled={disabled || comingSoon}
+            onClick={onClick}
+            className={cn(!active && 'text-foreground/70')}
+          >
+            <Icon className="size-4" />
+          </Button>
+        </span>
       </TooltipTrigger>
       <TooltipContent side="bottom" className="flex items-center gap-1.5">
-        {label}
-        {shortcut && (
+        {comingSoon ? `${label} · coming soon` : label}
+        {shortcut && !comingSoon && (
           <kbd className="rounded bg-background/20 px-1 text-[10px] font-medium">
             {shortcut}
           </kbd>
@@ -110,6 +119,7 @@ export const CanvasToolbar = memo(function CanvasToolbar() {
   const { canUndo, canRedo } = useCanvasHistory();
   const { zoom } = useCanvasStatus();
   const isReady = useCanvasReady();
+  const gridEnabled = useGridEnabled();
 
   const zoomPercent = Math.round(zoom * 100);
 
@@ -182,6 +192,17 @@ export const CanvasToolbar = memo(function CanvasToolbar() {
           disabled={!isReady}
           onClick={() => engine.fitToScreen()}
         />
+
+        <Separator orientation="vertical" className="mx-1 h-6" />
+
+        <IconButton
+          label="Toggle grid"
+          icon={Grid3x3}
+          active={gridEnabled}
+          disabled={!isReady}
+          onClick={() => engine.toggleGrid()}
+        />
+        <IconButton label="Export" icon={Download} comingSoon />
       </div>
     </div>
   );

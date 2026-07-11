@@ -8,11 +8,12 @@ import { Loader2 } from 'lucide-react';
 import { useMediaQuery } from '@/hooks';
 import { useThemeStore } from '@/store';
 import { useCanvasAdapter } from '../hooks/useCanvas';
-import { useCanvasReady } from '../hooks/useCanvasState';
+import { useCanvasReady, useGridEnabled } from '../hooks/useCanvasState';
 import type { PointerUpdatePayload } from '../adapters/ExcalidrawAdapter';
 import { documentToInitialData } from '../persistence/sceneSerialization';
 import { CanvasErrorBoundary } from './CanvasErrorBoundary';
 import { CanvasToolbar } from './CanvasToolbar';
+import { CanvasSelectionActions } from './CanvasSelectionActions';
 
 // Stable prop identities so Excalidraw never re-processes them on re-render.
 const UI_OPTIONS = {
@@ -53,6 +54,7 @@ interface CanvasProps {
 export function Canvas({ initialDocument }: CanvasProps) {
   const adapter = useCanvasAdapter();
   const containerRef = useRef<HTMLDivElement>(null);
+  const gridEnabled = useGridEnabled();
 
   // Excalidraw consumes `initialData` once at mount; compute it up front.
   const initialDataRef = useRef(documentToInitialData(initialDocument));
@@ -97,10 +99,12 @@ export function Canvas({ initialDocument }: CanvasProps) {
           theme={resolvedTheme}
           handleKeyboardGlobally
           autoFocus
+          gridModeEnabled={gridEnabled}
           initialData={initialDataRef.current}
           UIOptions={UI_OPTIONS}
         />
         <CanvasToolbar />
+        <CanvasSelectionActions />
         <CanvasLoadingOverlay />
       </div>
     </CanvasErrorBoundary>

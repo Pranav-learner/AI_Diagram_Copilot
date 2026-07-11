@@ -10,9 +10,15 @@ Application for an AI-powered diagram platform. Built in modules:
 - **Phase 1 · Module 3** — cloud persistence: FastAPI + PostgreSQL backend,
   real project CRUD, and debounced autosave. Draw, close the tab, reopen — your
   work is there.
+- **Phase 1 · Module 4 (v1.0)** — production polish: an editable inspector
+  (colors, text, arrowheads, transform), a full toolbar (group/ungroup/duplicate/
+  delete/grid), a rich status bar, keyboard-shortcut reference, a settings page,
+  error boundaries, offline handling, accessibility, and responsive/collapsible
+  panels.
 
 There is still **no AI and no diagram DSL** — those plug into the seams built
-here in later modules.
+here in later modules. See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for the full
+design and Phase 2 readiness.
 
 ## Tech stack
 
@@ -149,3 +155,15 @@ Canvas change → sceneVersion↑ → debounce (1.2s) → dirty check → PUT /d
   `SidebarContent` between its desktop rail and mobile drawer; sort and filter
   share a generic `OptionSelect`.
 - **Barrel exports** per feature folder keep imports clean and stable.
+
+## Roadmap
+
+**Phase 1 — Standalone editor (done).** Dashboard, editor, canvas engine,
+property editing, autosave, persistence, settings, polish.
+
+**Phase 2 — Diagram DSL + AI.** A Diagram DSL becomes the source of truth
+(stored in the same opaque `DiagramDocument`, so no backend change). AI features
+— natural-language → diagram, conversational editing, explanation, review —
+drive the editor through the existing `CanvasEngine` API. See
+[ARCHITECTURE.md](./ARCHITECTURE.md#phase-2-readiness) for the seams already in
+place.

@@ -6,3 +6,5 @@ export { UserMenu } from './UserMenu';
 export { OptionSelect } from './OptionSelect';
 export { PageLoader } from './PageLoader';
 export { SaveStatusIndicator } from './SaveStatusIndicator';
+export { OfflineBanner } from './OfflineBanner';
+export { ShortcutsDialog } from './ShortcutsDialog';

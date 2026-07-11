@@ -1,4 +1,10 @@
-import type { CanvasScene, CanvasSnapshot, CanvasTool, SelectedElement } from './types/canvas';
+import type {
+  CanvasScene,
+  CanvasSnapshot,
+  CanvasTool,
+  ElementStyleUpdate,
+  SelectedElement,
+} from './types/canvas';
 
 /**
  * The host the engine reports state changes to. Injected at construction so the
@@ -40,8 +46,13 @@ export interface CanvasEngine {
 
   // ── Selection ────────────────────────────────────────────────────────────
   getSelected(): readonly SelectedElement[];
+  selectAll(): void;
   deleteSelected(): void;
   duplicateSelected(): void;
+  groupSelected(): void;
+  ungroupSelected(): void;
+  /** Apply a partial style/geometry update to the current selection. */
+  updateSelected(update: ElementStyleUpdate): void;
 
   // ── History ──────────────────────────────────────────────────────────────
   undo(): void;
@@ -53,9 +64,11 @@ export interface CanvasEngine {
   resetZoom(): void;
   fitToScreen(): void;
 
-  // ── Tools ────────────────────────────────────────────────────────────────
+  // ── Tools & view ──────────────────────────────────────────────────────────
   setTool(tool: CanvasTool): void;
   getTool(): CanvasTool;
+  setGrid(enabled: boolean): void;
+  toggleGrid(): void;
 }
 
 /** Zoom bounds Excalidraw enforces; mirrored here to keep the UI honest. */
