@@ -5,3 +5,4 @@ export { EmptyState } from './EmptyState';
 export { UserMenu } from './UserMenu';
 export { OptionSelect } from './OptionSelect';
 export { PageLoader } from './PageLoader';
+export { SaveStatusIndicator } from './SaveStatusIndicator';

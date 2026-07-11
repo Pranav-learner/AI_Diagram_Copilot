@@ -61,8 +61,16 @@ export class ExcalidrawAdapter implements CanvasEngine {
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
 
-  /** Called by the Canvas host once Excalidraw hands over its imperative API. */
+  /**
+   * Called by the Canvas host once Excalidraw hands over its imperative API.
+   * Re-attach safe: on any genuine remount we tear down the previous
+   * subscription first so a stale `onChange` can't keep writing to the store.
+   */
   attach(api: ExcalidrawImperativeAPI, container: HTMLElement | null): void {
+    if (this.api === api) return;
+    this.unsubscribe?.();
+    this.lastVersion = -1;
+    this.lastSelectionKey = '';
     this.api = api;
     this.container = container;
     this.unsubscribe = api.onChange((elements, appState) =>

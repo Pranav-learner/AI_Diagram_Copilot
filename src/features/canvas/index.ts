@@ -13,6 +13,7 @@ export { useCanvas } from './hooks/useCanvas';
 // Reactive state selectors
 export {
   useActiveTool,
+  useSceneVersion,
   useCanvasReady,
   useCanvasError,
   useCanvasStatus,
@@ -21,6 +22,14 @@ export {
   type CanvasStatus,
   type HistoryState,
 } from './hooks/useCanvasState';
+
+// Persistence (scene ⇄ document). The engine never touches the network/SQL;
+// these pure helpers translate between the canvas scene and the stored doc.
+export {
+  serializeScene,
+  documentToInitialData,
+  type DiagramDocument,
+} from './persistence/sceneSerialization';
 
 // UI surfaces
 export { Canvas } from './components/Canvas';

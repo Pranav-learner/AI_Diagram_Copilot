@@ -10,6 +10,7 @@ import { useThemeStore } from '@/store';
 import { useCanvasAdapter } from '../hooks/useCanvas';
 import { useCanvasReady } from '../hooks/useCanvasState';
 import type { PointerUpdatePayload } from '../adapters/ExcalidrawAdapter';
+import { documentToInitialData } from '../persistence/sceneSerialization';
 import { CanvasErrorBoundary } from './CanvasErrorBoundary';
 import { CanvasToolbar } from './CanvasToolbar';
 
@@ -38,14 +39,23 @@ function CanvasLoadingOverlay() {
   );
 }
 
+interface CanvasProps {
+  /** Persisted document to hydrate the canvas with. Read once on mount. */
+  initialDocument?: unknown;
+}
+
 /**
  * Embeds Excalidraw and connects it to the {@link ExcalidrawAdapter}. This is a
- * thin host: it forwards the imperative API and pointer updates to the adapter
- * and renders the app's own toolbar overlay. All behavior lives in the engine.
+ * thin host: it forwards the imperative API and pointer updates to the adapter,
+ * hydrates from a persisted document, and renders the app's own toolbar overlay.
+ * All behavior lives in the engine.
  */
-export function Canvas() {
+export function Canvas({ initialDocument }: CanvasProps) {
   const adapter = useCanvasAdapter();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Excalidraw consumes `initialData` once at mount; compute it up front.
+  const initialDataRef = useRef(documentToInitialData(initialDocument));
 
   const themePreference = useThemeStore((s) => s.theme);
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
@@ -87,6 +97,7 @@ export function Canvas() {
           theme={resolvedTheme}
           handleKeyboardGlobally
           autoFocus
+          initialData={initialDataRef.current}
           UIOptions={UI_OPTIONS}
         />
         <CanvasToolbar />

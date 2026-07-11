@@ -13,5 +13,12 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    // Proxy API calls to the FastAPI backend during development, avoiding CORS.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
   },
 });

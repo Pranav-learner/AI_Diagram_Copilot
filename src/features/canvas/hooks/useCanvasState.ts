@@ -12,6 +12,11 @@ export function useActiveTool(): CanvasTool {
   return useCanvasStore((s) => s.activeTool);
 }
 
+/** Scene version — changes whenever the diagram's elements change. */
+export function useSceneVersion(): number {
+  return useCanvasStore((s) => s.sceneVersion);
+}
+
 export function useCanvasReady(): boolean {
   return useCanvasStore((s) => s.isReady);
 }

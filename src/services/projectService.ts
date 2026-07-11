@@ -3,99 +3,76 @@ import type {
   Project,
   UpdateProjectInput,
 } from '@/types';
-import { SEED_PROJECTS } from './mockData';
+import { ApiError, apiClient } from './apiClient';
 
 /**
- * Mock project API.
+ * Project API client.
  *
- * This module simulates the FastAPI + PostgreSQL backend that will be wired up
- * in a later module. It keeps an in-memory collection and returns Promises with
- * artificial latency so the UI exercises real loading and error states. The
- * TanStack Query hooks in `hooks/useProjects` are the only consumers — swapping
- * this file for real `fetch` calls later requires no changes upstream.
+ * Acts as an anti-corruption layer: the backend speaks `name`, this app speaks
+ * `title`. The mapping lives here so components and hooks stay unchanged from
+ * the mock-data era — only this file learned to talk to FastAPI.
  */
 
-const LATENCY_MS = 450;
-
-// Cloned so mutations never leak back into the immutable seed array.
-let db: Project[] = SEED_PROJECTS.map((p) => ({ ...p }));
-
-function delay<T>(value: T, ms: number = LATENCY_MS): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms));
+/** Wire shape returned by the backend. */
+interface ProjectDto {
+  id: string;
+  name: string;
+  description: string;
+  thumbnailUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
-/** Reasonably unique id without pulling in a uuid dependency. */
-function generateId(): string {
-  const rand = Math.random().toString(36).slice(2, 8);
-  const time = Date.now().toString(36).slice(-4);
-  return `prj_${time}${rand}`;
+function toProject(dto: ProjectDto): Project {
+  return {
+    id: dto.id,
+    title: dto.name,
+    description: dto.description,
+    thumbnailUrl: dto.thumbnailUrl,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+  };
 }
 
 export const projectService = {
   async list(): Promise<Project[]> {
-    return delay(db.map((p) => ({ ...p })));
+    const dtos = await apiClient.get<ProjectDto[]>('/projects');
+    return dtos.map(toProject);
   },
 
   async get(id: string): Promise<Project | null> {
-    const found = db.find((p) => p.id === id);
-    return delay(found ? { ...found } : null);
+    try {
+      const dto = await apiClient.get<ProjectDto>(`/projects/${id}`);
+      return toProject(dto);
+    } catch (error) {
+      if (error instanceof ApiError && error.isNotFound) return null;
+      throw error;
+    }
   },
 
   async create(input: CreateProjectInput): Promise<Project> {
-    const timestamp = nowIso();
-    const project: Project = {
-      id: generateId(),
-      title: input.title.trim(),
-      description: input.description?.trim() ?? '',
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      thumbnailUrl: null,
-    };
-    db = [project, ...db];
-    return delay({ ...project });
+    const dto = await apiClient.post<ProjectDto>('/projects', {
+      name: input.title,
+      description: input.description ?? '',
+    });
+    return toProject(dto);
   },
 
   async update(id: string, input: UpdateProjectInput): Promise<Project> {
-    const index = db.findIndex((p) => p.id === id);
-    if (index === -1) {
-      throw new Error(`Project ${id} not found`);
-    }
-    const existing = db[index]!;
-    const updated: Project = {
-      ...existing,
-      ...(input.title !== undefined ? { title: input.title.trim() } : {}),
-      ...(input.description !== undefined
-        ? { description: input.description.trim() }
-        : {}),
-      updatedAt: nowIso(),
-    };
-    db = db.map((p) => (p.id === id ? updated : p));
-    return delay({ ...updated });
+    const body: { name?: string; description?: string } = {};
+    if (input.title !== undefined) body.name = input.title;
+    if (input.description !== undefined) body.description = input.description;
+    const dto = await apiClient.patch<ProjectDto>(`/projects/${id}`, body);
+    return toProject(dto);
   },
 
   async duplicate(id: string): Promise<Project> {
-    const source = db.find((p) => p.id === id);
-    if (!source) {
-      throw new Error(`Project ${id} not found`);
-    }
-    const timestamp = nowIso();
-    const copy: Project = {
-      ...source,
-      id: generateId(),
-      title: `${source.title} (Copy)`,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    db = [copy, ...db];
-    return delay({ ...copy });
+    const dto = await apiClient.post<ProjectDto>(`/projects/${id}/duplicate`);
+    return toProject(dto);
   },
 
   async remove(id: string): Promise<{ id: string }> {
-    db = db.filter((p) => p.id !== id);
-    return delay({ id });
+    await apiClient.delete<void>(`/projects/${id}`);
+    return { id };
   },
 };

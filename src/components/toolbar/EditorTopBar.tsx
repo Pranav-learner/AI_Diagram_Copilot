@@ -10,7 +10,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Logo, ThemeToggle, UserMenu } from '@/components/common';
+import {
+  Logo,
+  SaveStatusIndicator,
+  ThemeToggle,
+  UserMenu,
+} from '@/components/common';
 
 interface EditorTopBarProps {
   project: Project | null | undefined;
@@ -89,6 +94,12 @@ export function EditorTopBar({ project, isLoading }: EditorTopBarProps) {
           </span>
         )}
       </nav>
+
+      {!isLoading && (
+        <div className="ml-2 hidden sm:block">
+          <SaveStatusIndicator />
+        </div>
+      )}
 
       <div className="ml-auto flex items-center gap-0.5">
         <ComingSoonAction label="Share" icon={Share2} />

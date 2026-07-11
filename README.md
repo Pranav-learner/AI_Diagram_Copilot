@@ -7,14 +7,33 @@ Application for an AI-powered diagram platform. Built in modules:
 - **Phase 1 · Module 2** — a fully functional manual diagram editor: Excalidraw
   integrated behind a clean `CanvasEngine` abstraction, engine-backed toolbar,
   live inspector, and status bar.
+- **Phase 1 · Module 3** — cloud persistence: FastAPI + PostgreSQL backend,
+  real project CRUD, and debounced autosave. Draw, close the tab, reopen — your
+  work is there.
 
-There is still **no AI, no backend persistence, and no diagram DSL** — those plug
-into the seams built here in later modules.
+There is still **no AI and no diagram DSL** — those plug into the seams built
+here in later modules.
 
 ## Tech stack
 
-React · TypeScript (strict) · Vite · Tailwind CSS · shadcn/ui (Radix) ·
+**Frontend:** React · TypeScript (strict) · Vite · Tailwind · shadcn/ui (Radix) ·
 React Router · Zustand · TanStack Query · Excalidraw
+
+**Backend:** FastAPI · SQLAlchemy 2 · PostgreSQL · Alembic (see `backend/`)
+
+## Running the full stack
+
+```bash
+# 1. Backend (see backend/README.md for details)
+cd backend
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+cp .env.example .env                 # set DATABASE_URL
+.venv/bin/alembic upgrade head
+.venv/bin/uvicorn app.main:app --port 8000
+
+# 2. Frontend (in another terminal) — /api is proxied to :8000
+npm install && npm run dev
+```
 
 ## Getting started
 
@@ -61,12 +80,14 @@ src/
 │       ├── hooks/                 # useCanvas (engine) + reactive selectors
 │       ├── components/            # Canvas host, Toolbar, Inspector, StatusBar
 │       └── types/                 # engine-agnostic canvas types
-├── hooks/        # data (TanStack Query) + UI hooks
+├── hooks/        # data hooks (TanStack Query: projects, diagram, autosave) + UI
 ├── pages/        # route components
-├── services/     # mock backend (stands in for FastAPI + PostgreSQL)
-├── store/        # Zustand stores: project, ui, theme
+├── services/     # API client: apiClient, projectService, diagramApi
+├── store/        # Zustand stores: project, ui, theme, autosave
 ├── types/        # shared TypeScript types
 └── utils/        # pure helpers (formatting, query, thumbnails, cn)
+
+backend/          # FastAPI + SQLAlchemy + PostgreSQL (see backend/README.md)
 ```
 
 ### The CanvasEngine abstraction
@@ -83,14 +104,34 @@ cursor, readiness) is published by the adapter to `useCanvasStore` and read via
 narrow selector hooks. Swapping engines later means writing one new adapter — no
 UI changes.
 
-### Key decisions
+### Persistence & autosave (Module 3)
 
-- **Server state vs. client state are separated.** Project *data* lives only in
-  the TanStack Query cache (fed by `services/projectService`, a mock backend with
-  simulated latency). The `project` Zustand store holds only *view* state —
-  search, sort, filter, view mode, and which dialog is open. No data is
-  duplicated across the two. Swapping the mock service for real `fetch` calls
-  later requires no changes upstream.
+```
+Canvas change → sceneVersion↑ → debounce (1.2s) → dirty check → PUT /diagram → Saved
+```
+
+- **The canvas engine never knows SQL; the database never knows Excalidraw.**
+  The engine deals only in scenes. A pure serializer (`serializeScene` /
+  `documentToInitialData`, in the canvas feature) translates a scene ⇄ a
+  versioned `DiagramDocument`. The API sends that document as **opaque JSON**;
+  Postgres stores it as **JSONB**. Neither side is coupled to the other — and
+  the `schema`/`version` envelope is the seam for the Phase 2 Diagram-DSL
+  migration (add a new `schema`, no storage change).
+- **Autosave is timer/ref-driven, not render-driven.** `useAutosave` debounces
+  on scene-version changes, guards against no-ops (dirty check) and concurrent
+  requests (in-flight flag), retries with exponential backoff, and flushes when
+  connectivity returns. Status (`Saving…/Saved/Offline/failed`) lives in its own
+  `autosave` store, read by the top-bar indicator.
+- **Server state vs. client state stay separated.** Project + diagram *data*
+  live only in the TanStack Query cache; the `project` store holds view state
+  (search/sort/filter/dialogs) and the `autosave` store holds save status. The
+  diagram query uses `staleTime: Infinity` so a refocus never clobbers unsaved
+  edits — autosave is the single writer that keeps the cache current.
+- **Anti-corruption at the API edge.** The backend speaks `name`; the app speaks
+  `title`. The mapping lives in `projectService`, so components and hooks were
+  unchanged when the mock backend became a real one.
+- **Backend clean architecture:** routes → services → repositories → models,
+  with domain exceptions mapped to HTTP at the edge (details in `backend/`).
 - **Imperative vs. reactive canvas state are split.** The engine interface is
   purely imperative (commands). All *observable* canvas state lives in a plain
   Zustand store the adapter writes to — so the high-rate updates from drawing and

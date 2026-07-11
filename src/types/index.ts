@@ -4,6 +4,8 @@ export type {
   UpdateProjectInput,
 } from './project';
 
+export type { DiagramResponse } from './diagram';
+
 export type {
   ViewMode,
   SortOption,
