@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 /**
  * Global, cross-cutting UI chrome state that is not specific to the project
  * collection or the editor canvas — e.g. sidebar collapse and the mobile
- * navigation drawer. Kept separate from `useProjectStore` and `useEditorStore`
+ * navigation drawer. Kept separate from `useProjectStore` and the canvas store
  * so unrelated concerns don't share a store.
  */
 interface UIState {

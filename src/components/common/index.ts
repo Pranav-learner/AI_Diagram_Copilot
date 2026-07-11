@@ -4,3 +4,4 @@ export { SearchInput } from './SearchInput';
 export { EmptyState } from './EmptyState';
 export { UserMenu } from './UserMenu';
 export { OptionSelect } from './OptionSelect';
+export { PageLoader } from './PageLoader';

@@ -1,0 +1,25 @@
+/*
+ * Scoped overrides for Excalidraw's built-in chrome.
+ *
+ * We hide the native tool palette and the bottom-left footer (zoom + undo/redo)
+ * because the app provides its own engine-backed toolbar and status bar. We keep
+ * Excalidraw's contextual properties panel (colors, stroke, opacity) and the
+ * library, since those remain the fastest way to edit element styling.
+ *
+ * Selectors are scoped under `.adc-canvas` and use Excalidraw's stable public
+ * class names. If a future Excalidraw version renames them, its native controls
+ * simply reappear — a graceful, still-functional fallback rather than a break.
+ */
+
+.adc-canvas .App-toolbar-container {
+  display: none !important;
+}
+
+.adc-canvas .layer-ui__wrapper__footer-left {
+  display: none !important;
+}
+
+/* Let the app background show through so light/dark themes stay seamless. */
+.adc-canvas .excalidraw {
+  --color-primary: hsl(var(--primary));
+}

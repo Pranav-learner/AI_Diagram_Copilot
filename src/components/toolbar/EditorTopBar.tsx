@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, Menu, Redo2, Search, Share2, Undo2 } from 'lucide-react';
+import { ChevronRight, Menu, Search, Share2 } from 'lucide-react';
 import type { Project } from '@/types';
 import { useUIStore } from '@/store';
 import { Button } from '@/components/ui/button';
@@ -91,12 +91,6 @@ export function EditorTopBar({ project, isLoading }: EditorTopBarProps) {
       </nav>
 
       <div className="ml-auto flex items-center gap-0.5">
-        <div className="hidden items-center sm:flex">
-          <ComingSoonAction label="Undo" icon={Undo2} />
-          <ComingSoonAction label="Redo" icon={Redo2} />
-          <Separator orientation="vertical" className="mx-1 h-6" />
-        </div>
-        <ComingSoonAction label="Search" icon={Search} />
         <ComingSoonAction label="Share" icon={Share2} />
         <Separator orientation="vertical" className="mx-1 h-6" />
         <ThemeToggle />
