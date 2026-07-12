@@ -5,6 +5,7 @@
  */
 
 import type { ValidationIssue } from '@/dsl';
+import type { OperationIssue } from './operations/Operation';
 
 export class DiagramEngineError extends Error {
   constructor(message: string) {
@@ -54,5 +55,44 @@ export class RendererNotFoundError extends DiagramEngineError {
   constructor(id: string) {
     super(`No renderer registered with id "${id}"`);
     this.name = 'RendererNotFoundError';
+  }
+}
+
+/** An operation failed validation and was not applied. Carries the issues. */
+export class OperationError extends DiagramEngineError {
+  readonly operationType: string;
+  readonly issues: readonly OperationIssue[];
+  constructor(operationType: string, issues: readonly OperationIssue[]) {
+    const summary = issues.map((i) => i.message).join('; ') || 'invalid operation';
+    super(`Operation "${operationType}" rejected: ${summary}`);
+    this.name = 'OperationError';
+    this.operationType = operationType;
+    this.issues = issues;
+  }
+}
+
+/** A transaction was rolled back (an operation inside it failed). */
+export class TransactionError extends DiagramEngineError {
+  readonly cause?: Error;
+  constructor(message: string, cause?: Error) {
+    super(message);
+    this.name = 'TransactionError';
+    this.cause = cause;
+  }
+}
+
+/** An undo/redo could not be performed (empty stack, or a corrupt entry). */
+export class HistoryError extends DiagramEngineError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HistoryError';
+  }
+}
+
+/** No operation is registered under the requested type (registry lookup). */
+export class OperationNotFoundError extends DiagramEngineError {
+  constructor(type: string) {
+    super(`No operation registered with type "${type}"`);
+    this.name = 'OperationNotFoundError';
   }
 }

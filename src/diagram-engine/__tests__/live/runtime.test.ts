@@ -6,10 +6,10 @@ describe('DiagramRuntime', () => {
   it('commits a genuine change, bumping version and emitting', () => {
     const model = makeModel();
     model.createNode({ type: 'shape', shape: 'rectangle' });
-    const runtime = new DiagramRuntime(model.document, 'load');
+    const runtime = new DiagramRuntime(model.document, { origin: 'load' });
 
     let events = 0;
-    runtime.events.on('document:changed', () => (events += 1));
+    runtime.events.on('diagram:changed', () => (events += 1));
 
     const model2 = makeModel();
     model2.createNode({ type: 'shape', shape: 'ellipse' });
@@ -24,7 +24,7 @@ describe('DiagramRuntime', () => {
   it('is idempotent: committing an equal document is a no-op', () => {
     const model = makeModel();
     model.createNode({ type: 'shape', shape: 'rectangle' });
-    const runtime = new DiagramRuntime(model.document, 'load');
+    const runtime = new DiagramRuntime(model.document, { origin: 'load' });
     let events = 0;
     runtime.events.on('commit', () => (events += 1));
 

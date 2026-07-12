@@ -14,7 +14,8 @@ import type { RenderingEngine } from '../renderer/RenderingEngine';
 import type { CanvasPort } from '../bridge/CanvasPort';
 import type { CanvasBridge, Scheduler } from '../bridge/CanvasBridge';
 import { CanvasBridgeImpl } from '../bridge/CanvasBridgeImpl';
-import { DiagramRuntime } from '../state/DiagramRuntime';
+import { DiagramRuntime } from '../runtime/DiagramRuntime';
+import type { DiagramRuntimeOptions } from '../runtime/DiagramRuntime';
 import { CanvasLifecycle } from './CanvasLifecycle';
 
 export interface EditorIntegrationOptions<TScene> {
@@ -22,6 +23,8 @@ export interface EditorIntegrationOptions<TScene> {
   readonly port: CanvasPort<TScene>;
   readonly initialDocument: DiagramDocument;
   readonly signature: (scene: TScene) => string;
+  /** Runtime tuning (ids/clock/history); `origin` defaults to `'load'`. */
+  readonly runtime?: DiagramRuntimeOptions;
   readonly rendererId?: string;
   readonly scheduler?: Scheduler;
   readonly settleScheduler?: (release: () => void) => void;
@@ -40,7 +43,7 @@ export interface EditorIntegration {
 export function createEditorIntegration<TScene>(
   options: EditorIntegrationOptions<TScene>,
 ): EditorIntegration {
-  const runtime = new DiagramRuntime(options.initialDocument, 'load');
+  const runtime = new DiagramRuntime(options.initialDocument, { origin: 'load', ...options.runtime });
   const bridge = new CanvasBridgeImpl<TScene>({
     engine: options.engine,
     runtime,

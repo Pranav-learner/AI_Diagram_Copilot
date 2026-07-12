@@ -198,6 +198,17 @@ Quality gates: `npm run typecheck`, `npm run lint`, `npm run build`;
 > `subscribeChange`/`applyScene`/`get`+`setSelectedIds`. Verified in-browser
 > (draw → DSL persisted, reopen idempotent, legacy migrates, no loop) and via
 > Vitest. The editor behaves as before; every change now flows through the DSL.
+>
+> **Phase 2 · Module 4 — Operation runtime: implemented.** The
+> [`DiagramRuntime`](src/diagram-engine/RUNTIME-OPERATIONS.md) is now the sole DSL
+> mutation API: every change is a typed, immutable **Operation** run through
+> validate → transaction → apply → commit → patch→history → events. Reversibility
+> is patch-based (operation-based history, no per-op inverse), transactions are
+> atomic + nested, and undo/redo is operation-based — the toolbar + Ctrl/Cmd+Z now
+> drive `runtime.undo()/redo()` (Excalidraw's native history suppressed). Manual
+> edits flow through `recordCanvasChange`. Verified in-browser (draw → Undo removes
+> + persists → Redo restores) and via Vitest. Future AI emits Operations to
+> `executeBatch` — it never touches Excalidraw or the DSL directly.
 
 The design intentionally leaves seams for the Diagram DSL to become the source
 of truth and for AI to drive the editor:

@@ -63,6 +63,28 @@ export function DiagramRuntimeProvider({ data, children }: DiagramRuntimeProvide
 
   useEffect(() => () => integration.dispose(), [integration]);
 
+  // Operation-based undo/redo owns Ctrl/Cmd+Z: intercept at capture phase and
+  // stop the event so Excalidraw's native history never fires (single source).
+  useEffect(() => {
+    const runtime = integration.runtime;
+    const handler = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return; // let text fields handle their own undo
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (event.shiftKey) runtime.redo();
+      else runtime.undo();
+    };
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
+  }, [integration]);
+
   const value = useMemo(
     () => ({ runtime: integration.runtime, bridge: integration.bridge, initialData: initial.initialData }),
     [integration, initial],

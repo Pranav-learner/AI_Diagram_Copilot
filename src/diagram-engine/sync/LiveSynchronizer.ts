@@ -21,7 +21,7 @@ import type { EventEmitter } from '../events/EventEmitter';
 import type { CanvasPort } from '../bridge/CanvasPort';
 import type { BridgeEventMap } from '../bridge/BridgeEvents';
 import { BridgeEventName } from '../bridge/BridgeEvents';
-import type { DiagramRuntime } from '../state/DiagramRuntime';
+import type { DiagramRuntime } from '../runtime/DiagramRuntime';
 import type { TransactionManager } from './TransactionManager';
 import type { VersionManager } from './VersionManager';
 
@@ -90,7 +90,9 @@ export class LiveSynchronizer<TScene> {
 
     const parsed = engine.parse<TScene, unknown>(scene, rendererId).document;
     const merged = mergeCanvasIntoDocument(runtime.getDocument(), parsed);
-    const committed = runtime.commit(merged, 'canvas');
+    // Route the manual edit through the runtime so it becomes an undoable,
+    // operation-based history entry (commit origin 'canvas' → no re-render).
+    const committed = runtime.recordCanvasChange(merged);
     if (!committed) {
       events.emit(BridgeEventName.EchoDropped, { reason: 'idempotent' });
       return false;
@@ -121,7 +123,9 @@ export class LiveSynchronizer<TScene> {
     versions.markApplied(signature(result.scene));
     const release = transactions.lock();
     try {
-      port.applyScene(result.scene, { captureHistory: true });
+      // Program renders (undo/redo, AI) must not enter Excalidraw's native
+      // history — the runtime owns history now.
+      port.applyScene(result.scene, { captureHistory: false });
     } finally {
       if (this.deps.settleScheduler) this.deps.settleScheduler(release);
       else release();

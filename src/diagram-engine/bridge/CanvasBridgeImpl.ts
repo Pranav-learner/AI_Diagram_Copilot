@@ -11,7 +11,7 @@
 import type { DiagramDocument } from '@/dsl';
 import type { RenderingEngine } from '../renderer/RenderingEngine';
 import { EventEmitter } from '../events/EventEmitter';
-import type { DiagramRuntime } from '../state/DiagramRuntime';
+import type { DiagramRuntime } from '../runtime/DiagramRuntime';
 import { TransactionManager } from '../sync/TransactionManager';
 import { VersionManager } from '../sync/VersionManager';
 import { LiveSynchronizer } from '../sync/LiveSynchronizer';

@@ -17,6 +17,7 @@ export {
   useDiagramBridge,
   useDiagramInitialData,
 } from './runtime/useDiagramRuntime';
+export { useRuntimeHistory } from './runtime/useRuntimeHistory';
 
 // Reactive state selectors
 export {

@@ -29,11 +29,11 @@ import {
 import { useCanvas } from '../hooks/useCanvas';
 import {
   useActiveTool,
-  useCanvasHistory,
   useCanvasReady,
   useCanvasStatus,
   useGridEnabled,
 } from '../hooks/useCanvasState';
+import { useRuntimeHistory } from '../runtime/useRuntimeHistory';
 import type { CanvasTool } from '../types/canvas';
 
 interface ToolDef {
@@ -115,8 +115,9 @@ export const IconButton = memo(function IconButton({
  */
 export const CanvasToolbar = memo(function CanvasToolbar() {
   const engine = useCanvas();
+  const history = useRuntimeHistory();
   const activeTool = useActiveTool();
-  const { canUndo, canRedo } = useCanvasHistory();
+  const { canUndo, canRedo } = history;
   const { zoom } = useCanvasStatus();
   const isReady = useCanvasReady();
   const gridEnabled = useGridEnabled();
@@ -145,14 +146,14 @@ export const CanvasToolbar = memo(function CanvasToolbar() {
           icon={Undo2}
           shortcut="Ctrl+Z"
           disabled={!isReady || !canUndo}
-          onClick={() => engine.undo()}
+          onClick={history.undo}
         />
         <IconButton
           label="Redo"
           icon={Redo2}
           shortcut="Ctrl+Shift+Z"
           disabled={!isReady || !canRedo}
-          onClick={() => engine.redo()}
+          onClick={history.redo}
         />
 
         <Separator orientation="vertical" className="mx-1 h-6" />
