@@ -1,25 +1,61 @@
 import { useMemo, type ReactNode } from 'react';
-import { DiagramGenerator } from '@/ai';
-import { useDiagramRuntime } from '@/features/canvas';
+import { DiagramGenerator, DiagramEditor, RuleBasedIntentAnalyzer } from '@/ai';
+import { useDiagramRuntime, useDiagramBridge } from '@/features/canvas';
 import { createRuntimeGateway } from '@/features/canvas/runtime/runtimeGateway';
+import { createRuntimeContextSource } from './runtimeContextSource';
 import { createEditorAIService } from './aiService';
 import { AIGenerationContext } from './AIGenerationContext';
+import { useAiSettingsStore, settingsToConfigOverride } from './store/useAiSettingsStore';
 
 /**
- * Wires the AI generation stack to the live runtime. Builds the AIService (real
- * provider if configured, else the demo mock), adapts the runtime to the AI
- * layer's {@link DiagramGateway} port, and constructs one {@link DiagramGenerator}
- * for this editor session. Must sit inside {@link DiagramRuntimeProvider}.
+ * Wires the AI copilot (generation + editing) to the live runtime. Builds one
+ * AIService from the current AI settings, the runtime gateway, and the read-side
+ * context source, then constructs a generator + editor sharing them. Rebuilds
+ * when the relevant settings change. Must sit inside {@link DiagramRuntimeProvider}.
  */
 export function AIGenerationProvider({ children }: { children: ReactNode }) {
   const runtime = useDiagramRuntime();
+  const bridge = useDiagramBridge();
+
+  // Subscribe to the settings that affect the service so it rebuilds on change.
+  const provider = useAiSettingsStore((s) => s.provider);
+  const model = useAiSettingsStore((s) => s.model);
+  const temperature = useAiSettingsStore((s) => s.temperature);
+  const maxTokens = useAiSettingsStore((s) => s.maxTokens);
+  const streaming = useAiSettingsStore((s) => s.streaming);
+  const promptVersion = useAiSettingsStore((s) => s.promptVersion);
 
   const value = useMemo(() => {
-    const { service, usingMock } = createEditorAIService();
+    const override = settingsToConfigOverride({
+      provider,
+      model,
+      temperature,
+      maxTokens,
+      streaming,
+      promptVersion,
+      debug: false,
+      set: () => {},
+      reset: () => {},
+    });
+    const bundle = createEditorAIService(override);
     const gateway = createRuntimeGateway(runtime);
-    const generator = new DiagramGenerator({ service, gateway });
-    return { generator, runtime, usingMock };
-  }, [runtime]);
+    const contextSource = createRuntimeContextSource(runtime, bridge);
+    const generator = new DiagramGenerator({ service: bundle.service, gateway, stream: streaming });
+    const editor = new DiagramEditor({ service: bundle.service, gateway, contextSource, stream: streaming });
+    const intentAnalyzer = new RuleBasedIntentAnalyzer();
+    return {
+      generator,
+      editor,
+      runtime,
+      contextSource,
+      intentAnalyzer,
+      metrics: bundle.metrics,
+      provider: bundle.providerId,
+      model: bundle.model,
+      usingMock: bundle.usingMock,
+      availableProviders: bundle.availableProviders,
+    };
+  }, [runtime, bridge, provider, model, temperature, maxTokens, streaming, promptVersion]);
 
   return <AIGenerationContext.Provider value={value}>{children}</AIGenerationContext.Provider>;
 }

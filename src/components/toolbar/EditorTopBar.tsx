@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, Menu, Search, Share2 } from 'lucide-react';
+import { ChevronRight, Menu, Search, Share2, Sparkles } from 'lucide-react';
 import type { Project } from '@/types';
 import { useUIStore } from '@/store';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,8 @@ function ComingSoonAction({
  */
 export function EditorTopBar({ project, isLoading }: EditorTopBarProps) {
   const openMobileSidebar = useUIStore((s) => s.setMobileSidebarOpen);
+  const aiSidebarOpen = useUIStore((s) => s.aiSidebarOpen);
+  const toggleAiSidebar = useUIStore((s) => s.toggleAiSidebar);
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 sm:px-4">
@@ -103,6 +105,20 @@ export function EditorTopBar({ project, isLoading }: EditorTopBarProps) {
       )}
 
       <div className="ml-auto flex items-center gap-0.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={aiSidebarOpen ? 'secondary' : 'ghost'}
+              size="icon"
+              onClick={toggleAiSidebar}
+              aria-label="Toggle AI copilot"
+              aria-pressed={aiSidebarOpen}
+            >
+              <Sparkles />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>AI Copilot</TooltipContent>
+        </Tooltip>
         <div className="hidden sm:block">
           <ShortcutsDialog />
         </div>

@@ -19,36 +19,79 @@ import {
   AnthropicProvider,
   OpenAIProvider,
   MockPlanProvider,
+  MockEditProvider,
   mergeConfig,
 } from '@/ai';
+import type { AIProvider, ProviderCapabilities, ChatResponse, ResolvedRequest, StreamChunk, AIConfigOverride } from '@/ai';
+
+/**
+ * A single mock provider that serves BOTH capabilities without a key: it inspects
+ * the system prompt and routes to the plan mock (generation) or the edit mock
+ * (editing). This mirrors a real provider — one endpoint, JSON shaped by the
+ * prompt — so the rest of the app is identical with or without credentials.
+ */
+class MockAssistantProvider implements AIProvider {
+  readonly id = 'mock-assistant';
+  readonly capabilities: ProviderCapabilities = { streaming: true, jsonMode: true, systemPrompt: true, maxContextTokens: 100_000 };
+  private readonly plan = new MockPlanProvider();
+  private readonly edit = new MockEditProvider();
+
+  complete(request: ResolvedRequest, signal?: AbortSignal): Promise<ChatResponse> {
+    return this.pick(request).complete(request, signal);
+  }
+  stream(request: ResolvedRequest, signal?: AbortSignal): AsyncIterable<StreamChunk> {
+    return this.pick(request).stream(request, signal);
+  }
+  private pick(request: ResolvedRequest): AIProvider {
+    const system = request.messages.find((m) => m.role === 'system')?.content ?? '';
+    return /EditPlan/.test(system) ? this.edit : this.plan;
+  }
+}
 
 export interface EditorAIBundle {
   readonly service: AIService;
   readonly metrics: AIMetrics;
   readonly providerId: string;
+  /** The effective model for the primary (reasoning) tier. */
+  readonly model: string;
   /** True when no real key is configured and the heuristic mock is in use. */
   readonly usingMock: boolean;
+  /** Provider ids available to choose from in settings. */
+  readonly availableProviders: readonly string[];
 }
 
-export function createEditorAIService(): EditorAIBundle {
+/**
+ * Build the editor AIService from optional settings overrides. Registers the
+ * demo mock plus any key-configured real providers, honours a requested provider
+ * when available (else falls back), and applies model/temperature/streaming
+ * overrides. The one place the app selects a provider.
+ */
+export function createEditorAIService(override: AIConfigOverride = {}): EditorAIBundle {
   const env = import.meta.env;
   const registry = new ProviderRegistry();
-  registry.register(new MockPlanProvider());
+  registry.register(new MockAssistantProvider());
 
-  let providerId = 'mock-plan';
-  let usingMock = true;
-
+  let autoProvider = 'mock-assistant';
   if (env.VITE_ANTHROPIC_API_KEY) {
     registry.register(new AnthropicProvider({ apiKey: env.VITE_ANTHROPIC_API_KEY }));
-    providerId = 'anthropic';
-    usingMock = false;
+    autoProvider = 'anthropic';
   } else if (env.VITE_OPENAI_API_KEY) {
     registry.register(new OpenAIProvider({ apiKey: env.VITE_OPENAI_API_KEY }));
-    providerId = 'openai';
-    usingMock = false;
+    autoProvider = 'openai';
   }
 
+  // Honour a requested provider only when it is actually registered.
+  const providerId = override.provider && registry.has(override.provider) ? override.provider : autoProvider;
+  const config = mergeConfig({ ...override, provider: providerId });
+
   const metrics = new AIMetrics();
-  const service = new AIService({ registry, config: mergeConfig({ provider: providerId }), metrics });
-  return { service, metrics, providerId, usingMock };
+  const service = new AIService({ registry, config, metrics });
+  return {
+    service,
+    metrics,
+    providerId,
+    model: config.models.reasoning.model,
+    usingMock: providerId === 'mock-assistant',
+    availableProviders: registry.ids(),
+  };
 }

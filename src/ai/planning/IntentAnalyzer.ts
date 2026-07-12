@@ -58,7 +58,11 @@ const RULES: readonly IntentRule[] = [
   { intent: 'generate', patterns: [/\b(create|generate|draw|make|build|design|new)\b/i] },
   {
     intent: 'edit',
-    patterns: [/\b(add|remove|delete|move|rename|connect|change|update|resize|recolor|arrange)\b/i],
+    patterns: [
+      /\b(add|remove|delete|drop|move|rename|connect|disconnect|change|update|resize|arrange|reorder)\b/i,
+      // Styling/structural editing verbs (introduced with conversational editing).
+      /\b(colou?r|recolou?r|style|highlight|group|ungroup|replace|swap)\b/i,
+    ],
     needsDiagram: true,
   },
   { intent: 'explain', patterns: [/\b(explain|describe|what does|what is|walk me through|summar)\b/i], needsDiagram: true },

@@ -61,3 +61,6 @@ export * from './pipeline/AIPipeline';
 
 // ── Capability: AI Diagram Generation (Phase 3, Module 2) ────────────────────
 export * from './generation';
+
+// ── Capability: Conversational Diagram Editing (Phase 3, Module 3) ───────────
+export * from './editing';

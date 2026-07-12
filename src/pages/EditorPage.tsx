@@ -11,7 +11,8 @@ import {
   CanvasStatusBar,
   DiagramRuntimeProvider,
 } from '@/features/canvas';
-import { AIGenerationProvider, GenerationPanel } from '@/features/ai';
+import { AIGenerationProvider, AiSidebar } from '@/features/ai';
+import { useUIStore } from '@/store';
 
 /** Dotted-canvas skeleton shown while project + diagram load. */
 function CanvasLoading() {
@@ -71,6 +72,12 @@ function DiagramNotFound({ projectId }: { projectId: string | undefined }) {
   );
 }
 
+/** Renders the AI copilot sidebar when toggled on. */
+function AiSidebarSlot() {
+  const open = useUIStore((s) => s.aiSidebarOpen);
+  return open ? <AiSidebar /> : null;
+}
+
 /** Runs the autosave loop; renders nothing. Lives inside CanvasProvider. */
 function AutosaveController({
   projectId,
@@ -99,13 +106,13 @@ function EditorWorkspace({
             project={project}
             isLoading={false}
             inspector={<CanvasInspector />}
+            aiSidebar={<AiSidebarSlot />}
             statusBar={<CanvasStatusBar />}
           >
             <AutosaveController
               projectId={project.id}
               initialVersion={diagram.version}
             />
-            <GenerationPanel />
             <Canvas />
           </EditorLayout>
         </AIGenerationProvider>

@@ -10,6 +10,8 @@ interface EditorLayoutProps {
   children: ReactNode;
   /** Right inspector panel. */
   inspector?: ReactNode;
+  /** Right-docked AI copilot sidebar (outermost right). */
+  aiSidebar?: ReactNode;
   /** Bottom status bar. */
   statusBar?: ReactNode;
 }
@@ -25,6 +27,7 @@ export function EditorLayout({
   isLoading,
   children,
   inspector,
+  aiSidebar,
   statusBar,
 }: EditorLayoutProps) {
   return (
@@ -37,6 +40,7 @@ export function EditorLayout({
           {children}
         </main>
         {inspector}
+        {aiSidebar}
       </div>
 
       {statusBar}

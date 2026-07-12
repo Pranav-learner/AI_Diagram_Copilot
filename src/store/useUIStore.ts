@@ -14,12 +14,16 @@ interface UIState {
   inspectorCollapsed: boolean;
   /** Editor sidebar drawer open on mobile/tablet. */
   mobileSidebarOpen: boolean;
+  /** AI copilot sidebar open (right-docked). */
+  aiSidebarOpen: boolean;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleInspector: () => void;
   setInspectorCollapsed: (collapsed: boolean) => void;
   setMobileSidebarOpen: (open: boolean) => void;
+  toggleAiSidebar: () => void;
+  setAiSidebarOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -28,6 +32,7 @@ export const useUIStore = create<UIState>()(
       sidebarCollapsed: false,
       inspectorCollapsed: false,
       mobileSidebarOpen: false,
+      aiSidebarOpen: true,
 
       toggleSidebar: () =>
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -37,12 +42,15 @@ export const useUIStore = create<UIState>()(
       setInspectorCollapsed: (inspectorCollapsed) =>
         set({ inspectorCollapsed }),
       setMobileSidebarOpen: (mobileSidebarOpen) => set({ mobileSidebarOpen }),
+      toggleAiSidebar: () => set((state) => ({ aiSidebarOpen: !state.aiSidebarOpen })),
+      setAiSidebarOpen: (aiSidebarOpen) => set({ aiSidebarOpen }),
     }),
     {
       name: 'adc-ui',
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         inspectorCollapsed: state.inspectorCollapsed,
+        aiSidebarOpen: state.aiSidebarOpen,
       }),
     },
   ),
