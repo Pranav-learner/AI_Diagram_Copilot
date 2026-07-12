@@ -13,7 +13,7 @@
  * transaction). The LLM cannot produce operations; it can only describe intent.
  */
 
-import type { NewNode, NewGroup, Point, Size, Style, Metadata, MetadataValue, ShapeKind, RoutingKind } from '@/dsl';
+import type { NewNode, Point, Size, Style, Metadata, MetadataValue, ShapeKind, RoutingKind } from '@/dsl';
 import type { OperationDescriptor, OperationPlan } from '../validation/schemas/operationPlan';
 import type { IdMinter } from '../planning/OperationPlanner';
 import { counterIdMinter } from '../planning/OperationPlanner';
@@ -132,7 +132,9 @@ export class ExecutionPlanner {
     for (const group of plan.groups ?? []) {
       const childIds = group.nodeIds.map((id) => nodeIdMap[id]).filter((id): id is string => Boolean(id));
       if (childIds.length === 0) continue;
-      const spec: NewGroup = { name: group.label, childIds };
+      // `params` is an opaque record at the runtime boundary; the runtime casts
+      // childIds to branded GroupChildIds internally, so a plain object is correct.
+      const spec = { name: group.label, childIds };
       operations.push(descriptor('group.create', { id: this.ids.group(), spec }, `Group ${group.label}`));
     }
 

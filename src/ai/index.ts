@@ -58,3 +58,6 @@ export * from './observability/AIMetrics';
 // ── Pipeline (composition + extensibility seam) ──────────────────────────────
 export * from './pipeline/IntentHandler';
 export * from './pipeline/AIPipeline';
+
+// ── Capability: AI Diagram Generation (Phase 3, Module 2) ────────────────────
+export * from './generation';
