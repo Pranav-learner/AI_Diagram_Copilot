@@ -61,8 +61,11 @@ export interface Renderer<TScene, TElement> {
   withElements(scene: TScene, elements: readonly TElement[]): TScene;
   /** Structural equality ignoring volatile fields (version/nonce/timestamps). */
   elementsEqual(a: TElement, b: TElement): boolean;
-  /** Return a copy with its reconciliation version advanced. */
-  bumpVersion(element: TElement): TElement;
+  /**
+   * Return `next` with its reconciliation version advanced past `previous`, so
+   * the target engine accepts it as an update (not a stale write).
+   */
+  bumpVersion(next: TElement, previous: TElement): TElement;
   /** Apply the document's viewport to the scene (appState only, no elements). */
   applyViewport(scene: TScene, doc: DiagramDocument, ctx: RendererContext): TScene;
   /** An empty scene (used as the base for a full render). */
