@@ -50,7 +50,6 @@ export type SemanticType =
   | 'process'
   | 'terminator'
   | 'custom'
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   | (string & {});
 
 /** How a shape's label is positioned relative to the shape. */

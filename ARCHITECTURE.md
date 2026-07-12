@@ -173,6 +173,12 @@ Quality gates: `npm run typecheck`, `npm run lint`, `npm run build`;
 
 ## Phase 2 readiness
 
+> **Phase 2 · Module 1 — Diagram DSL: implemented.** The domain model now lives
+> in [`src/dsl/`](src/dsl/README.md) — a pure, renderer/backend/AI-agnostic,
+> versioned model (`DiagramModel`, validation, serialization, migration,
+> repository) with its own Vitest suite (`npm run test:run`). It is additive and
+> not yet wired into rendering/persistence; that wiring is a later module.
+
 The design intentionally leaves seams for the Diagram DSL to become the source
 of truth and for AI to drive the editor:
 
