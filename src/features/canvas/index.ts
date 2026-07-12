@@ -10,6 +10,14 @@
 export { CanvasProvider } from './context/CanvasProvider';
 export { useCanvas } from './hooks/useCanvas';
 
+// Live runtime (Module 3): DSL becomes the source of truth.
+export { DiagramRuntimeProvider } from './runtime/DiagramRuntimeProvider';
+export {
+  useDiagramRuntime,
+  useDiagramBridge,
+  useDiagramInitialData,
+} from './runtime/useDiagramRuntime';
+
 // Reactive state selectors
 export {
   useActiveTool,

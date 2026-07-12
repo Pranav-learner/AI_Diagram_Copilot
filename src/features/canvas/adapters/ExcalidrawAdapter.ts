@@ -53,6 +53,10 @@ export class ExcalidrawAdapter implements CanvasEngine {
   private lastVersion = -1;
   private lastSelectionKey = '';
 
+  // Live-bridge scene subscribers + a key so we only notify on real changes.
+  private readonly sceneListeners = new Set<(scene: CanvasScene) => void>();
+  private lastNotifyKey = '';
+
   // Best-effort history tracking (Excalidraw exposes no history availability).
   private historyNav = false;
 
@@ -74,6 +78,7 @@ export class ExcalidrawAdapter implements CanvasEngine {
     this.unsubscribe?.();
     this.lastVersion = -1;
     this.lastSelectionKey = '';
+    this.lastNotifyKey = '';
     this.api = api;
     this.container = container;
     this.unsubscribe = api.onChange((elements, appState) =>
@@ -135,6 +140,19 @@ export class ExcalidrawAdapter implements CanvasEngine {
     }
 
     this.host.patch(patch);
+
+    // Notify the live bridge on genuine content/viewport changes only (pointer
+    // moves that change nothing are filtered out by the key).
+    if (this.sceneListeners.size > 0) {
+      const notifyKey = `${version}:${appState.zoom.value}:${Math.round(
+        appState.scrollX,
+      )}:${Math.round(appState.scrollY)}:${appState.viewBackgroundColor}`;
+      if (notifyKey !== this.lastNotifyKey) {
+        this.lastNotifyKey = notifyKey;
+        const scene = this.getScene();
+        for (const listener of [...this.sceneListeners]) listener(scene);
+      }
+    }
   };
 
   /** Forwarded from Excalidraw's `onPointerUpdate` prop. */
@@ -185,6 +203,41 @@ export class ExcalidrawAdapter implements CanvasEngine {
       );
       return false;
     }
+  }
+
+  // ── Live runtime bridge (Module 3) ─────────────────────────────────────────
+
+  subscribeChange(listener: (scene: CanvasScene) => void): () => void {
+    this.sceneListeners.add(listener);
+    return () => this.sceneListeners.delete(listener);
+  }
+
+  /**
+   * Apply rendered elements without disturbing selection or viewport — those are
+   * user-owned. Excalidraw reconciles by id + version, so only the elements whose
+   * version the synchronizer bumped actually repaint.
+   */
+  applyScene(scene: CanvasScene, options: { captureHistory?: boolean } = {}): void {
+    this.api?.updateScene({
+      elements: scene.elements as unknown as Elements,
+      captureUpdate: options.captureHistory
+        ? CaptureUpdateAction.IMMEDIATELY
+        : CaptureUpdateAction.NEVER,
+    });
+  }
+
+  getSelectedIds(): readonly string[] {
+    return [...this.selectedIdSet()];
+  }
+
+  setSelectedIds(ids: readonly string[]): void {
+    if (!this.api) return;
+    const selectedElementIds: Record<string, true> = {};
+    for (const id of ids) selectedElementIds[id] = true;
+    this.api.updateScene({
+      appState: { selectedElementIds },
+      captureUpdate: CaptureUpdateAction.NEVER,
+    });
   }
 
   // ── Selection ────────────────────────────────────────────────────────────

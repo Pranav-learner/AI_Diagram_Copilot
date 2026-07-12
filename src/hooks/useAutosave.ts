@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import {
-  serializeScene,
-  useCanvas,
-  useCanvasReady,
-  useSceneVersion,
-} from '@/features/canvas';
+import { useDiagramRuntime } from '@/features/canvas';
 import { ApiError, diagramApi } from '@/services';
 import { useAutosaveStore, useSettingsStore } from '@/store';
 import { useSaveDiagram } from './useDiagram';
@@ -14,30 +9,27 @@ const MAX_RETRY_DELAY_MS = 30_000;
 
 interface UseAutosaveOptions {
   projectId: string;
-  /** The diagram version returned when the scene was loaded. */
+  /** The diagram version returned when the document was loaded. */
   initialVersion: number;
 }
 
 /**
- * Autosave loop: canvas change → debounce → dirty check → save → success, with
- * retry/backoff and offline handling.
+ * Autosave loop, driven by the **DSL runtime** (Module 3): runtime commit →
+ * debounce → dirty check → persist the DSL document → success, with retry/backoff
+ * and offline handling.
  *
- * Timing is driven by refs (not React state) so the frequent scene-version
- * updates never re-render this hook's host, and an in-flight guard plus a
- * dirty check prevent duplicate/no-op requests ("no save spam").
+ * The persisted payload is now the `DiagramDocument` itself (the source of
+ * truth), not the Excalidraw scene. Timing is driven by refs so the frequent
+ * commit stream never re-renders the host; an in-flight guard plus a version
+ * dirty check prevent duplicate/no-op requests.
  */
-export function useAutosave({
-  projectId,
-  initialVersion,
-}: UseAutosaveOptions): void {
-  const engine = useCanvas();
-  const isReady = useCanvasReady();
-  const sceneVersion = useSceneVersion();
+export function useAutosave({ projectId, initialVersion }: UseAutosaveOptions): void {
+  const runtime = useDiagramRuntime();
   const saveMutation = useSaveDiagram();
   const setStatus = useAutosaveStore((s) => s.set);
   const autosaveEnabled = useSettingsStore((s) => s.autosaveEnabled);
 
-  const latestVersion = useRef(sceneVersion);
+  const latestVersion = useRef(runtime.getVersion());
   const savedVersion = useRef<number | null>(null);
   const serverVersion = useRef(initialVersion);
   const inFlight = useRef(false);
@@ -45,10 +37,6 @@ export function useAutosave({
   const debounceTimer = useRef<number | null>(null);
   const retryTimer = useRef<number | null>(null);
   const runRef = useRef<() => void>(() => {});
-
-  useEffect(() => {
-    latestVersion.current = sceneVersion;
-  }, [sceneVersion]);
 
   const scheduleDebounced = useCallback(() => {
     if (debounceTimer.current) window.clearTimeout(debounceTimer.current);
@@ -79,7 +67,8 @@ export function useAutosave({
 
     let succeeded = false;
     try {
-      const data = serializeScene(engine.getScene());
+      // Persist the DSL document — the single source of truth.
+      const data = runtime.getDocument();
       const result = await saveMutation.mutateAsync({
         projectId,
         data,
@@ -90,7 +79,6 @@ export function useAutosave({
       retries.current = 0;
       succeeded = true;
     } catch (error) {
-      // On a version conflict, rebase on the server's current version and retry.
       if (error instanceof ApiError && error.isConflict) {
         try {
           const latest = await diagramApi.get(projectId);
@@ -110,30 +98,37 @@ export function useAutosave({
 
     if (succeeded) {
       setStatus({ status: 'saved', lastSavedAt: Date.now(), error: null });
-      // Edits arrived while saving (save outlasted the debounce) — save again.
       if (latestVersion.current !== savedVersion.current) scheduleDebounced();
     }
-  }, [engine, projectId, saveMutation, setStatus, scheduleRetry, scheduleDebounced]);
+  }, [runtime, projectId, saveMutation, setStatus, scheduleRetry, scheduleDebounced]);
 
   useEffect(() => {
     runRef.current = () => void performSave();
   }, [performSave]);
 
-  // Establish the "already saved" baseline once the canvas is hydrated.
+  // Establish the "already saved" baseline from the runtime's initial version.
   useEffect(() => {
-    if (isReady && savedVersion.current === null) {
-      savedVersion.current = sceneVersion;
+    if (savedVersion.current === null) {
+      savedVersion.current = runtime.getVersion();
+      latestVersion.current = runtime.getVersion();
       setStatus({ status: 'saved', lastSavedAt: null, error: null });
     }
-  }, [isReady, sceneVersion, setStatus]);
+  }, [runtime, setStatus]);
 
-  // Debounce a save whenever the scene diverges from what's saved.
+  // Every committed DSL change schedules a debounced save.
   useEffect(() => {
-    if (!autosaveEnabled) return;
-    if (!isReady || savedVersion.current === null) return;
-    if (sceneVersion === savedVersion.current) return;
-    scheduleDebounced();
-  }, [sceneVersion, isReady, autosaveEnabled, scheduleDebounced]);
+    const unsubscribe = runtime.subscribe((state) => {
+      latestVersion.current = state.version;
+      if (
+        autosaveEnabled &&
+        savedVersion.current !== null &&
+        state.version !== savedVersion.current
+      ) {
+        scheduleDebounced();
+      }
+    });
+    return unsubscribe;
+  }, [runtime, autosaveEnabled, scheduleDebounced]);
 
   // Flush a pending save as soon as connectivity returns.
   useEffect(() => {
@@ -142,7 +137,7 @@ export function useAutosave({
     return () => window.removeEventListener('online', onOnline);
   }, []);
 
-  // Reset status and clear timers when leaving the editor.
+  // Clear timers when leaving the editor.
   useEffect(() => {
     return () => {
       if (debounceTimer.current) window.clearTimeout(debounceTimer.current);

@@ -37,6 +37,20 @@ export * from './sync/SceneDiff';
 export * from './sync/SceneComparator';
 export * from './sync/SceneSynchronizer';
 
+// ── Live runtime (Module 3) ───────────────────────────────────────────────────
+export * from './state/DiagramState';
+export * from './state/DiagramRuntime';
+export * from './sync/OriginTracker';
+export * from './sync/TransactionManager';
+export * from './sync/VersionManager';
+export * from './sync/LiveSynchronizer';
+export * from './bridge/CanvasPort';
+export * from './bridge/BridgeEvents';
+export * from './bridge/CanvasBridge';
+export * from './bridge/CanvasBridgeImpl';
+export * from './integration/CanvasLifecycle';
+export * from './integration/EditorIntegration';
+
 // ── Excalidraw renderer ───────────────────────────────────────────────────────
 export * from './renderers/excalidraw/types';
 export * from './renderers/excalidraw/constants';

@@ -185,8 +185,19 @@ Quality gates: `npm run typecheck`, `npm run lint`, `npm run build`;
 > channels), with a diff-based incremental `SceneSynchronizer` (object reuse +
 > idempotent, loop-safe), a typed event system, and a pluggable `Renderer`
 > interface for future backends (Mermaid/SVG/Draw.io). Pure (imports only
-> `@/dsl`), additive, Vitest-tested. Live wiring is a documented `CanvasBridge`
-> seam, deferred to a later module.
+> `@/dsl`), additive, Vitest-tested.
+>
+> **Phase 2 · Module 3 — DSL as the live runtime: implemented.** A
+> [`CanvasBridge` + `DiagramRuntime`](src/diagram-engine/RUNTIME.md) makes the DSL
+> the live source of truth: every canvas edit is captured into the DSL
+> (`canvas → parse → DSL`), the DSL is what autosave persists (replacing the
+> `{schema:'excalidraw'}` scene envelope), and DSL edits render back incrementally.
+> Three-layer loop prevention (sync lock + scene signature + DSL idempotency) with
+> origin/transaction/version tracking. React binding: `ExcalidrawCanvasPort` +
+> `DiagramRuntimeProvider` in `src/features/canvas/runtime/`; `CanvasEngine` gained
+> `subscribeChange`/`applyScene`/`get`+`setSelectedIds`. Verified in-browser
+> (draw → DSL persisted, reopen idempotent, legacy migrates, no loop) and via
+> Vitest. The editor behaves as before; every change now flows through the DSL.
 
 The design intentionally leaves seams for the Diagram DSL to become the source
 of truth and for AI to drive the editor:

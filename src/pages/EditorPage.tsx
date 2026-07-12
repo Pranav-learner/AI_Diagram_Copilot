@@ -9,6 +9,7 @@ import {
   CanvasInspector,
   CanvasProvider,
   CanvasStatusBar,
+  DiagramRuntimeProvider,
 } from '@/features/canvas';
 
 /** Dotted-canvas skeleton shown while project + diagram load. */
@@ -91,18 +92,20 @@ function EditorWorkspace({
 }) {
   return (
     <CanvasProvider>
-      <EditorLayout
-        project={project}
-        isLoading={false}
-        inspector={<CanvasInspector />}
-        statusBar={<CanvasStatusBar />}
-      >
-        <AutosaveController
-          projectId={project.id}
-          initialVersion={diagram.version}
-        />
-        <Canvas initialDocument={diagram.data} />
-      </EditorLayout>
+      <DiagramRuntimeProvider data={diagram.data}>
+        <EditorLayout
+          project={project}
+          isLoading={false}
+          inspector={<CanvasInspector />}
+          statusBar={<CanvasStatusBar />}
+        >
+          <AutosaveController
+            projectId={project.id}
+            initialVersion={diagram.version}
+          />
+          <Canvas />
+        </EditorLayout>
+      </DiagramRuntimeProvider>
     </CanvasProvider>
   );
 }

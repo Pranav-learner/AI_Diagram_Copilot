@@ -44,6 +44,18 @@ export interface CanvasEngine {
   /** Load a scene, tolerating malformed input. Returns false on invalid data. */
   importScene(scene: unknown): boolean;
 
+  // ── Live runtime bridge (Module 3) ─────────────────────────────────────────
+  /** Subscribe to canvas content/viewport changes (raw scene). Used by the bridge. */
+  subscribeChange(listener: (scene: CanvasScene) => void): () => void;
+  /**
+   * Apply a scene's elements to the canvas. MUST NOT touch selection or viewport
+   * — those are user-owned and preserved. `captureHistory` makes it undoable.
+   */
+  applyScene(scene: CanvasScene, options?: { captureHistory?: boolean }): void;
+  /** Current selection ids (source of truth: Excalidraw appState). */
+  getSelectedIds(): readonly string[];
+  setSelectedIds(ids: readonly string[]): void;
+
   // ── Selection ────────────────────────────────────────────────────────────
   getSelected(): readonly SelectedElement[];
   selectAll(): void;
