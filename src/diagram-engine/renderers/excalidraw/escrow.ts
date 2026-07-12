@@ -29,7 +29,7 @@ import type {
   DiagramComment,
   NamedStyle,
   Metadata,
-  Size,
+  Viewport,
 } from '@/dsl';
 import { CUSTOM_DATA_KEY } from './constants';
 import type { ExElementBase, ExAppState } from './types';
@@ -59,7 +59,7 @@ export interface DocumentEscrow {
   readonly metadata: Metadata;
   readonly createdAt: string;
   readonly updatedAt: string;
-  readonly canvasSize: Size;
+  readonly viewport: Viewport;
   readonly styles: Readonly<Record<string, NamedStyle>>;
   readonly groups: Readonly<Record<string, DiagramGroup>>;
   readonly layers: Readonly<Record<string, Layer>>;

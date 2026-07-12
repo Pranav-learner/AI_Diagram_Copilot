@@ -8,7 +8,7 @@
 
 export type EventHandler<T> = (payload: T) => void;
 
-export class EventEmitter<Events extends Record<string, unknown>> {
+export class EventEmitter<Events> {
   // Internally untyped (handlers for different keys have different payloads);
   // the public surface restores full type safety per key.
   private readonly handlers = new Map<keyof Events, Set<EventHandler<never>>>();

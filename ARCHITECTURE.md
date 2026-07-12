@@ -178,6 +178,15 @@ Quality gates: `npm run typecheck`, `npm run lint`, `npm run build`;
 > versioned model (`DiagramModel`, validation, serialization, migration,
 > repository) with its own Vitest suite (`npm run test:run`). It is additive and
 > not yet wired into rendering/persistence; that wiring is a later module.
+>
+> **Phase 2 · Module 2 — Rendering & Synchronization Engine: implemented.** The
+> [`src/diagram-engine/`](src/diagram-engine/README.md) package maps the DSL ⇄
+> Excalidraw scenes bidirectionally (loss-aware via two `customData` escrow
+> channels), with a diff-based incremental `SceneSynchronizer` (object reuse +
+> idempotent, loop-safe), a typed event system, and a pluggable `Renderer`
+> interface for future backends (Mermaid/SVG/Draw.io). Pure (imports only
+> `@/dsl`), additive, Vitest-tested. Live wiring is a documented `CanvasBridge`
+> seam, deferred to a later module.
 
 The design intentionally leaves seams for the Diagram DSL to become the source
 of truth and for AI to drive the editor:
