@@ -114,9 +114,16 @@ export class CanvasBridgeImpl<TScene> implements CanvasBridge {
   }
 
   private flush(): void {
-    const scene = this.pendingScene;
+    if (this.pendingScene === null) return;
     this.pendingScene = null;
-    if (scene === null) return;
+    // Coalescing must reconcile the *current* canvas, not the (possibly stale)
+    // scene snapshot that scheduled this flush. A stale snapshot causes a real
+    // bug: an initial empty-mount onChange schedules a flush, then a program
+    // render (undo/redo, AI generation) paints elements whose own onChange is
+    // dropped by the lock — so the snapshot stays empty and, once flushed,
+    // parses to zero nodes and wipes the freshly-rendered DSL. Reading the live
+    // scene here means we always parse what is actually on the canvas.
+    const scene = this.options.port.getScene();
     try {
       const committed = this.sync.fromCanvas(scene);
       this.events.emit(BridgeEventName.CanvasChanged, { committed });

@@ -11,6 +11,7 @@ import {
   CanvasStatusBar,
   DiagramRuntimeProvider,
 } from '@/features/canvas';
+import { AIGenerationProvider, GenerationPanel } from '@/features/ai';
 
 /** Dotted-canvas skeleton shown while project + diagram load. */
 function CanvasLoading() {
@@ -93,18 +94,21 @@ function EditorWorkspace({
   return (
     <CanvasProvider>
       <DiagramRuntimeProvider data={diagram.data}>
-        <EditorLayout
-          project={project}
-          isLoading={false}
-          inspector={<CanvasInspector />}
-          statusBar={<CanvasStatusBar />}
-        >
-          <AutosaveController
-            projectId={project.id}
-            initialVersion={diagram.version}
-          />
-          <Canvas />
-        </EditorLayout>
+        <AIGenerationProvider>
+          <EditorLayout
+            project={project}
+            isLoading={false}
+            inspector={<CanvasInspector />}
+            statusBar={<CanvasStatusBar />}
+          >
+            <AutosaveController
+              projectId={project.id}
+              initialVersion={diagram.version}
+            />
+            <GenerationPanel />
+            <Canvas />
+          </EditorLayout>
+        </AIGenerationProvider>
       </DiagramRuntimeProvider>
     </CanvasProvider>
   );

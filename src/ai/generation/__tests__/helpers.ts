@@ -8,7 +8,8 @@ import { ProviderRegistry } from '../../providers/ProviderRegistry';
 import { mergeConfig } from '../../core/AIConfig';
 import { MockProvider } from '../../providers/MockProvider';
 import { MockPlanProvider } from '../MockPlanProvider';
-import type { DiagramGateway, OperationApplyResult, OperationPlan } from '../../planning/OperationPlanner';
+import type { DiagramGateway, OperationApplyResult } from '../../planning/OperationPlanner';
+import type { OperationPlan } from '../../validation/schemas/operationPlan';
 import { createDefaultOperationRegistry } from '@/diagram-engine';
 import type { DiagramPlan } from '../model/DiagramPlan';
 

@@ -29,7 +29,7 @@ describe('LayoutEngine', () => {
   const engine = createDefaultLayoutEngine();
 
   it('registers all built-in algorithms', () => {
-    expect(engine.kinds().sort()).toEqual(['grid', 'layered', 'linear', 'mindmap', 'radial', 'tree']);
+    expect([...engine.kinds()].sort()).toEqual(['grid', 'layered', 'linear', 'mindmap', 'radial', 'tree']);
   });
 
   it('falls back to the default kind for an unknown one', () => {
