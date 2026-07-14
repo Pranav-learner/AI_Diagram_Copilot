@@ -203,6 +203,33 @@ foundation every future document-facing feature consumes.
 extraction pipeline, and how the PKM will support Reverse Engineering, Smart Import,
 Repository Analysis, AI Documentation, and multi-agent workflows.
 
+### Phase 5 · Module 2 — Reverse Engineering Engine _(done)_ · `src/ai/reverse-engineering`
+
+The deterministic static-analysis foundation for every future repository feature. It
+turns source repositories + infrastructure manifests into a normalized AST, a Code
+Knowledge Graph, and PKM entities — the structured representations the LLM reasons
+over (never raw code). Parsing and analysis are 100% deterministic (no LLM), and it
+**unifies with the Document Intelligence Engine through a shared PKM**.
+
+- **Parser registry + 12 dependency-free parsers** — TypeScript/JavaScript, Python, Go,
+  Java, SQL, Dockerfile, Docker Compose, Kubernetes, Terraform, OpenAPI, GraphQL, JSON
+  Schema — each normalizing into one unified AST (parser-agnostic; new languages are
+  plugins).
+- **Static analysis** — dependency/import graph, call graph, inheritance/composition,
+  infrastructure wiring, database foreign keys, API endpoints, and architecture
+  extraction (bounded contexts, layers, services, shared libraries, integration points).
+- **Code Knowledge Graph → PKM** — architecture-significant entities merge into the
+  shared PKM, each retaining source/file/line/language/evidence/confidence.
+- **Incremental** — ASTs cached by content hash (a changed file re-parses only itself),
+  the graph rebuilt lazily, the PKM synced per-file by slice hash — never a full rescan.
+  Symbol/dependency/API/infra/relationship search; validation throughout.
+
+**No user-facing repository import yet** — only the reverse-engineering foundation. See
+**[src/ai/reverse-engineering/README.md](./src/ai/reverse-engineering/README.md)** for
+the parser architecture, AST normalization, and how it prepares Smart Import,
+Repository Copilot, Architecture Visualization, AI Documentation, and multi-agent
+workflows.
+
 ---
 
 ## Tech stack
@@ -296,6 +323,11 @@ layer — a stateful finding repository, ranked insight feed, timeline, and brie
 documents → Structured Document Model → deterministic knowledge extraction → Project
 Knowledge Model.
 
-**Phase 5+ (next)** — the document-powered capabilities the PKM was built to support:
-**Smart Import** (PKM → Diagram Planner → DSL), **Reverse Engineering**, Repository
-Analysis, AI Documentation, and multi-agent workflows.
+**Phase 5 · Module 2 (done)** — **Reverse Engineering Engine**: repositories +
+infrastructure → normalized AST → Code Knowledge Graph → PKM, deterministically, unified
+with documents.
+
+**Phase 5+ (next)** — the capabilities the PKM + Code Knowledge Graph were built to
+support: **Smart Import** (PKM → Architecture Planner → Diagram Planner → DSL),
+Repository Copilot, Architecture Visualization, AI Documentation, and multi-agent
+workflows.

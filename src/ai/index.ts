@@ -79,3 +79,6 @@ export * from './intelligence';
 
 // ── Capability: Document Intelligence Engine / PKM (Phase 5, Module 1) ────────
 export * from './knowledge';
+
+// ── Capability: Reverse Engineering Engine (Phase 5, Module 2) ───────────────
+export * from './reverse-engineering';

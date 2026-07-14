@@ -58,12 +58,15 @@ export interface EngineStats {
 
 export interface DocumentIntelligenceEngineDeps {
   readonly extractors?: readonly Extractor[];
+  /** Share a PKM across engines (e.g. with the Reverse Engineering Engine) to
+   *  unify documents and code. Defaults to a fresh model. */
+  readonly pkm?: ProjectKnowledgeModel;
 }
 
 type UpdateListener = (event: { readonly documentId: string; readonly change: 'ingested' | 'removed'; readonly version: number }) => void;
 
 export class DocumentIntelligenceEngine {
-  private readonly pkm = new ProjectKnowledgeModel();
+  private readonly pkm: ProjectKnowledgeModel;
   private readonly docIndex = new DocumentIndexer();
   private readonly docs = new Map<string, StructuredDocument>();
   private readonly extractors: readonly Extractor[];
@@ -80,6 +83,7 @@ export class DocumentIntelligenceEngine {
 
   constructor(deps: DocumentIntelligenceEngineDeps = {}) {
     this.extractors = deps.extractors ?? DEFAULT_EXTRACTORS;
+    this.pkm = deps.pkm ?? new ProjectKnowledgeModel();
   }
 
   get version(): number {
