@@ -23,6 +23,7 @@ import {
   MockExplainProvider,
   MockReviewProvider,
   MockInsightProvider,
+  MockProjectIntelligenceProvider,
   mergeConfig,
 } from '@/ai';
 import type { AIProvider, ProviderCapabilities, ChatResponse, ResolvedRequest, StreamChunk, AIConfigOverride } from '@/ai';
@@ -42,6 +43,7 @@ class MockAssistantProvider implements AIProvider {
   private readonly explain = new MockExplainProvider();
   private readonly review = new MockReviewProvider();
   private readonly insight = new MockInsightProvider();
+  private readonly projectIntelligence = new MockProjectIntelligenceProvider();
 
   complete(request: ResolvedRequest, signal?: AbortSignal): Promise<ChatResponse> {
     return this.pick(request).complete(request, signal);
@@ -51,6 +53,7 @@ class MockAssistantProvider implements AIProvider {
   }
   private pick(request: ResolvedRequest): AIProvider {
     const system = request.messages.find((m) => m.role === 'system')?.content ?? '';
+    if (/Project Intelligence/.test(system)) return this.projectIntelligence;
     if (/Intelligence Engine/.test(system)) return this.insight;
     if (/Diagram Review/.test(system)) return this.review;
     if (/Explain Mode/.test(system)) return this.explain;

@@ -68,3 +68,7 @@ export { detectConflicts as detectPimConflicts } from './fusion/ConflictResolver
 // ── The engine (the single front door) ──────────────────────────────────────────
 export { ProjectIntelligenceEngine } from './ProjectIntelligenceEngine';
 export type { ProjectIntelligenceEngineDeps, PimUpdateListener } from './ProjectIntelligenceEngine';
+
+// ── Mock Project Intelligence Provider ──────────────────────────────────────────
+export { MockProjectIntelligenceProvider } from './MockProjectIntelligenceProvider';
+

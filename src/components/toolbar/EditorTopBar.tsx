@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, Menu, Search, Share2, Sparkles } from 'lucide-react';
+import { ChevronRight, Menu, Search, Share2, Sparkles, Layers, Database } from 'lucide-react';
 import type { Project } from '@/types';
 import { useUIStore } from '@/store';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useProjectIntelligenceStore } from '@/features/ai/store/useProjectIntelligenceStore';
 import {
   Tooltip,
   TooltipContent,
@@ -54,6 +55,8 @@ export function EditorTopBar({ project, isLoading }: EditorTopBarProps) {
   const openMobileSidebar = useUIStore((s) => s.setMobileSidebarOpen);
   const aiSidebarOpen = useUIStore((s) => s.aiSidebarOpen);
   const toggleAiSidebar = useUIStore((s) => s.toggleAiSidebar);
+  const activeTab = useProjectIntelligenceStore((s) => s.activeTab);
+  const setActiveTab = useProjectIntelligenceStore((s) => s.setActiveTab);
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 sm:px-4">
@@ -97,6 +100,33 @@ export function EditorTopBar({ project, isLoading }: EditorTopBarProps) {
           </span>
         )}
       </nav>
+
+      {!isLoading && (
+        <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5 ml-4 text-xs font-medium">
+          <button
+            onClick={() => setActiveTab('canvas')}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1 transition-all duration-200 ${
+              activeTab === 'canvas'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Layers className="size-3.5" />
+            Canvas
+          </button>
+          <button
+            onClick={() => setActiveTab('intelligence')}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1 transition-all duration-200 ${
+              activeTab === 'intelligence'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Database className="size-3.5" />
+            Intelligence
+          </button>
+        </div>
+      )}
 
       {!isLoading && (
         <div className="ml-2 hidden sm:block">

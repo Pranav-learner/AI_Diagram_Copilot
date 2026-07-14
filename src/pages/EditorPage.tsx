@@ -11,7 +11,7 @@ import {
   CanvasStatusBar,
   DiagramRuntimeProvider,
 } from '@/features/canvas';
-import { AIGenerationProvider, AiSidebar } from '@/features/ai';
+import { AIGenerationProvider, AiSidebar, SoftwareIntelligenceWorkspace, useProjectIntelligenceStore } from '@/features/ai';
 import { useUIStore } from '@/store';
 
 /** Dotted-canvas skeleton shown while project + diagram load. */
@@ -98,6 +98,8 @@ function EditorWorkspace({
   project: Project;
   diagram: DiagramResponse;
 }) {
+  const activeTab = useProjectIntelligenceStore((s) => s.activeTab);
+
   return (
     <CanvasProvider>
       <DiagramRuntimeProvider data={diagram.data}>
@@ -105,15 +107,15 @@ function EditorWorkspace({
           <EditorLayout
             project={project}
             isLoading={false}
-            inspector={<CanvasInspector />}
-            aiSidebar={<AiSidebarSlot />}
-            statusBar={<CanvasStatusBar />}
+            inspector={activeTab === 'canvas' ? <CanvasInspector /> : undefined}
+            aiSidebar={activeTab === 'canvas' ? <AiSidebarSlot /> : undefined}
+            statusBar={activeTab === 'canvas' ? <CanvasStatusBar /> : undefined}
           >
             <AutosaveController
               projectId={project.id}
               initialVersion={diagram.version}
             />
-            <Canvas />
+            {activeTab === 'canvas' ? <Canvas /> : <SoftwareIntelligenceWorkspace />}
           </EditorLayout>
         </AIGenerationProvider>
       </DiagramRuntimeProvider>

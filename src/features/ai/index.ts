@@ -23,3 +23,7 @@ export { summarizePatch } from './lib/operationSummary';
 export type { OperationSummary } from './lib/operationSummary';
 export { humanizeError } from './lib/humanizeError';
 export type { HumanError } from './lib/humanizeError';
+
+export { SoftwareIntelligenceWorkspace } from './components/SoftwareIntelligenceWorkspace';
+export { useProjectIntelligenceStore } from './store/useProjectIntelligenceStore';
+
