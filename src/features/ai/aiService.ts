@@ -22,6 +22,7 @@ import {
   MockEditProvider,
   MockExplainProvider,
   MockReviewProvider,
+  MockInsightProvider,
   mergeConfig,
 } from '@/ai';
 import type { AIProvider, ProviderCapabilities, ChatResponse, ResolvedRequest, StreamChunk, AIConfigOverride } from '@/ai';
@@ -40,6 +41,7 @@ class MockAssistantProvider implements AIProvider {
   private readonly edit = new MockEditProvider();
   private readonly explain = new MockExplainProvider();
   private readonly review = new MockReviewProvider();
+  private readonly insight = new MockInsightProvider();
 
   complete(request: ResolvedRequest, signal?: AbortSignal): Promise<ChatResponse> {
     return this.pick(request).complete(request, signal);
@@ -49,6 +51,7 @@ class MockAssistantProvider implements AIProvider {
   }
   private pick(request: ResolvedRequest): AIProvider {
     const system = request.messages.find((m) => m.role === 'system')?.content ?? '';
+    if (/Intelligence Engine/.test(system)) return this.insight;
     if (/Diagram Review/.test(system)) return this.review;
     if (/Explain Mode/.test(system)) return this.explain;
     if (/EditPlan/.test(system)) return this.edit;

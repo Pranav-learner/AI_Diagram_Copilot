@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Info, BookMarked, Settings2, Trash2, PanelRightClose, MessageSquare } from 'lucide-react';
+import { Sparkles, Info, BookMarked, Settings2, Trash2, PanelRightClose, MessageSquare, Lightbulb } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,8 +12,9 @@ import { PromptComposer } from './PromptComposer';
 import { ContextInspector } from './ContextInspector';
 import { AiSettingsPanel } from './AiSettingsPanel';
 import { PromptLibrary } from './PromptLibrary';
+import { InsightsPanel } from './InsightsPanel';
 
-type View = 'chat' | 'context' | 'prompts' | 'settings';
+type View = 'chat' | 'insights' | 'context' | 'prompts' | 'settings';
 
 /**
  * The dedicated, right-docked AI copilot sidebar: a conversation with streaming
@@ -48,6 +49,7 @@ export function AiSidebar() {
         )}
         <div className="ml-auto flex items-center gap-0.5">
           <NavButton label="Chat" icon={MessageSquare} active={view === 'chat'} onClick={() => setView('chat')} />
+          <NavButton label="Insights" icon={Lightbulb} active={view === 'insights'} onClick={() => setView('insights')} />
           <NavButton label="Context" icon={Info} active={view === 'context'} onClick={() => setView('context')} />
           <NavButton label="Prompts" icon={BookMarked} active={view === 'prompts'} onClick={() => setView('prompts')} />
           <NavButton label="Settings" icon={Settings2} active={view === 'settings'} onClick={() => setView('settings')} />
@@ -78,6 +80,7 @@ export function AiSidebar() {
           <PromptComposer copilot={copilot} onOpenLibrary={() => setView('prompts')} />
         </>
       )}
+      {view === 'insights' && <div className="min-h-0 flex-1 overflow-hidden">{<InsightsPanel />}</div>}
       {view === 'context' && <div className="min-h-0 flex-1 overflow-y-auto">{<ContextInspector />}</div>}
       {view === 'prompts' && <div className="min-h-0 flex-1 overflow-hidden">{<PromptLibrary onReuse={reuse} />}</div>}
       {view === 'settings' && <div className="min-h-0 flex-1 overflow-y-auto">{<AiSettingsPanel />}</div>}

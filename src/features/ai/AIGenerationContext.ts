@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { DiagramGenerator, DiagramEditor, ExplainEngine, ReviewEngine, UnderstandingEngine, DiagramContextSource, IntentAnalyzer, AIMetrics } from '@/ai';
+import type { DiagramGenerator, DiagramEditor, ExplainEngine, ReviewEngine, IntelligenceEngine, UnderstandingEngine, DiagramContextSource, IntentAnalyzer, AIMetrics } from '@/ai';
 import type { DiagramRuntime } from '@/diagram-engine';
 
 /**
@@ -15,6 +15,8 @@ export interface AIGenerationContextValue {
   readonly explain: ExplainEngine;
   /** Diagram Review orchestrator (static analysis + LLM explanation). */
   readonly review: ReviewEngine;
+  /** The proactive Intelligence Engine (insight feed + timeline + briefing). */
+  readonly intelligence: IntelligenceEngine;
   /** The Understanding Engine kept in sync with the live diagram. */
   readonly understanding: UnderstandingEngine;
   /** Highlight elements on the canvas (used by review "focus finding"). */

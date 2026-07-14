@@ -147,6 +147,34 @@ gracefully to findings + scores.
 See **[src/ai/review/README.md](./src/ai/review/README.md)** for the rule engine,
 scoring model, and how it prepares AI Insights and Architecture Intelligence.
 
+### Phase 4 · Module 4 — Diagram Intelligence Engine _(done)_ · `src/ai/intelligence`
+
+The proactive **reasoning layer** — not another chat feature. It continuously
+watches the diagram, runs the deterministic static analysis, and maintains a stateful
+**Finding Repository** (new / resolved / recurring / dismissed, with history), which
+it aggregates and **ranks** into a proactive **insight feed**. The LLM lazily narrates
+a briefing ("I noticed this service has become a single point of failure"). The app
+discovers and scores; the AI reasons and recommends.
+
+- **Finding Repository** with incremental reconciliation (a `RepositoryDiff` of
+  added/resolved/recurring), duplicate suppression, recurrence tracking, and user
+  status (dismiss = hide; mark-resolved = fixed, resurfaces if still detected).
+- **Transparent ranking** by severity · confidence · business/technical impact ·
+  frequency · diagram context (hubs) · user activity — every insight explains *why*
+  it ranked where it did. Findings are **merged by rule** (one insight over N nodes)
+  and deduplicated.
+- **Proactive & incremental**: refreshes on diagram change, skips unchanged versions,
+  re-prioritises on selection, caches the briefing per version, and **degrades
+  gracefully** (feed works with no LLM). Plus an **intelligence timeline**, contextual
+  suggestions on selection, suggested next actions, and observability.
+- Delivered as the copilot sidebar's **Insights** view: filterable feed, priority
+  queue, briefing, next actions, timeline, and jump-to-affected-elements.
+
+See **[src/ai/intelligence/README.md](./src/ai/intelligence/README.md)** for the
+repository, ranking algorithm, lifecycle, and how it becomes the reasoning layer for
+Smart Import, Reverse Engineering, multi-agent collaboration, and enterprise
+intelligence.
+
 ---
 
 ## Tech stack
@@ -233,6 +261,9 @@ domain / audience / depth, with follow-ups — the first capability on the Seman
 **Phase 4 · Module 3 (done)** — **Diagram Review**: a deterministic rule engine over the
 Semantic Graph discovers findings and computes scores; the AI explains them.
 
-**Phase 4+ (next)** — the remaining understanding-powered capabilities that consume the
-Semantic Graph with **no changes to the engine**: **AI Insights**, then **Smart Import**,
-Architecture Intelligence, and multi-agent reasoning.
+**Phase 4 · Module 4 (done)** — **Diagram Intelligence Engine**: the proactive reasoning
+layer — a stateful finding repository, ranked insight feed, timeline, and briefing.
+
+**Phase 4+ (next)** — the enterprise capabilities this reasoning layer was built to
+support: **Smart Import**, **Reverse Engineering**, Architecture Intelligence, and
+multi-agent collaboration.

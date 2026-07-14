@@ -73,3 +73,6 @@ export * from './explain';
 
 // ── Capability: Diagram Review (Phase 4, Module 3) ───────────────────────────
 export * from './review';
+
+// ── Capability: Diagram Intelligence Engine (Phase 4, Module 4) ──────────────
+export * from './intelligence';
