@@ -82,3 +82,6 @@ export * from './knowledge';
 
 // ── Capability: Reverse Engineering Engine (Phase 5, Module 2) ───────────────
 export * from './reverse-engineering';
+
+// ── Project Intelligence Engine / PIM (Phase 5, Module 3) ─────────────────────
+export * from './project-intelligence';

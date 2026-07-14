@@ -230,6 +230,39 @@ the parser architecture, AST normalization, and how it prepares Smart Import,
 Repository Copilot, Architecture Visualization, AI Documentation, and multi-agent
 workflows.
 
+### Phase 5 · Module 3 — Project Intelligence Engine / PIM _(done)_ · `src/ai/project-intelligence`
+
+The **fusion layer**: it merges the knowledge extracted from documents, code,
+infrastructure, OpenAPI/GraphQL, databases, and existing diagrams (all via the shared
+PKM) into a single **Project Intelligence Model (PIM)** — a renderer-independent
+*semantic* "digital twin" of the whole project. Where the PKM stores facts per source,
+the PIM has **one entity per real-world concept**, with unified evidence, topology,
+conflicts, and inferred architecture. Deterministic — no LLM. Every future AI feature
+reasons over the PIM through the single `ProjectIntelligenceEngine`; raw repositories
+and parsers are never exposed.
+
+- **Entity resolution** — fuses `UserService` ↔ `user-service` ↔ `"User Service"` across
+  sources (canonical-key clustering with alias/version folding, kept within kind
+  families), keeping full PKM→PIM traceability and partial-match cross-references.
+- **Evidence model** — every fact keeps origin / source / location / confidence /
+  extraction method; merged and deduplicated across sources; multi-source corroboration
+  boosts confidence.
+- **Conflict detection** — documented-but-unimplemented, outdated diagrams, version
+  mismatches, duplicated ownership, inconsistent APIs — each explicit and evidence-backed.
+- **Topology graphs** — dependency, service, infrastructure, ownership, capability,
+  requirement, workflow projections.
+- **Semantic enrichment** — inferred layers, bounded contexts, business domains,
+  capabilities, and critical / shared / entry-point / exit-point tagging.
+- **Query · search · cross-reference · validation** — `downstreamImpact`, `findOwners`,
+  `findImplementation`/`findDeployment`, docs ↔ code ↔ infra ↔ diagram navigation, lazy
+  incremental rebuilds, and diagram ingestion.
+
+**No user-facing features yet** (no Import Wizard, Repository UI, AI Chat, Multi-Agent, or
+Architecture Generation) — only the intelligence foundation. See
+**[src/ai/project-intelligence/README.md](./src/ai/project-intelligence/README.md)** for
+the fusion pipeline and how the PIM prepares Import/Repository Copilot, AI Documentation,
+multi-agent reasoning, and Enterprise Architecture Intelligence.
+
 ---
 
 ## Tech stack
