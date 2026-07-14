@@ -64,3 +64,6 @@ export * from './generation';
 
 // ── Capability: Conversational Diagram Editing (Phase 3, Module 3) ───────────
 export * from './editing';
+
+// ── Diagram Understanding Engine (Phase 4, Module 1) ─────────────────────────
+export * from './understanding';

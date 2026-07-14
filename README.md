@@ -1,169 +1,181 @@
 # AI Diagram Copilot
 
-Application for an AI-powered diagram platform. Built in modules:
+A production-grade, AI-powered diagram platform. You draw and manage diagrams in a
+polished editor; the AI can **generate**, **edit**, and (as of Phase 4) **understand**
+them — all through a clean, renderer-independent domain model rather than by poking at
+the canvas.
 
-- **Phase 1 · Module 1** — polished application shell: dashboard, project
-  management UI, routing, editor layout, theming, state management.
-- **Phase 1 · Module 2** — a fully functional manual diagram editor: Excalidraw
-  integrated behind a clean `CanvasEngine` abstraction, engine-backed toolbar,
-  live inspector, and status bar.
-- **Phase 1 · Module 3** — cloud persistence: FastAPI + PostgreSQL backend,
-  real project CRUD, and debounced autosave. Draw, close the tab, reopen — your
-  work is there.
-- **Phase 1 · Module 4 (v1.0)** — production polish: an editable inspector
-  (colors, text, arrowheads, transform), a full toolbar (group/ungroup/duplicate/
-  delete/grid), a rich status bar, keyboard-shortcut reference, a settings page,
-  error boundaries, offline handling, accessibility, and responsive/collapsible
-  panels.
+The project is built in strict, self-contained modules. Each layer talks to the next
+through a narrow, typed seam, so capabilities stack without rewrites.
 
-There is still **no AI and no diagram DSL** — those plug into the seams built
-here in later modules. See **[ARCHITECTURE.md](./ARCHITECTURE.md)** for the full
-design and Phase 2 readiness.
+```
+Excalidraw ⇄ Rendering Engine ⇄ Diagram Runtime ⇄ Diagram DSL  ← source of truth
+                                                        ↑
+                              AI layer (@/ai): Generation · Editing · Understanding
+```
+
+---
+
+## What's implemented
+
+### Phase 1 — Standalone editor _(done)_
+
+- **Application shell** — dashboard, project CRUD UI, routing, editor layout, theming
+  (light/dark/system, no flash), focused Zustand stores, responsive down to mobile.
+- **Manual diagram editor** — Excalidraw integrated behind a clean `CanvasEngine`
+  abstraction; engine-backed toolbar, live inspector, status bar; draw/move/resize/
+  group/undo/redo — all native canvas behavior.
+- **Cloud persistence + autosave** — FastAPI + PostgreSQL backend, real project CRUD,
+  debounced timer-driven autosave with retry/offline handling. The engine speaks
+  _scenes_; the DB stores _opaque JSON_ — neither is coupled to the other.
+- **v1.0 polish** — editable inspector, full toolbar, keyboard shortcuts, settings,
+  error boundaries, accessibility, collapsible panels.
+
+### Phase 2 — Diagram DSL, engine & runtime _(done)_ · `src/dsl`, `src/diagram-engine`
+
+- **The Diagram DSL** (`src/dsl`) — a pure, immutable, fully JSON-serializable domain
+  model (`DiagramDocument`): normalized id-keyed collections, primitives, validation,
+  migration, serialization/diff, and an ergonomic `DiagramModel` facade. Imports nothing
+  from React/Excalidraw/the API. **This is the single source of truth.**
+- **Rendering & sync engine** (`src/diagram-engine`) — a renderer-agnostic
+  `RenderingEngine` (with an Excalidraw renderer), plus a live bridge that keeps the DSL
+  and the canvas in sync in both directions.
+- **The Diagram Runtime** — the sole mutation API: `execute` / `transaction` / `undo` /
+  `redo` over patch-based history, operation-based undo, and a strongly-typed **event
+  bus** (`operation:*`, `transaction:committed`, `diagram:changed`, …) that everything
+  else observes without touching internals.
+
+### Phase 3 — AI Foundation, Generation & Editing _(done)_ · `src/ai`, `src/features/ai`
+
+- **AI Foundation** (`src/ai`, infra only) — a provider-agnostic orchestration layer:
+  `AIService`/`AIClient`, pluggable providers (Anthropic/OpenAI/Gemini/Local/Mock),
+  `PromptBuilder`, `ContextBuilder`, `IntentAnalyzer`, `ResponseValidator` (zod),
+  `OperationPlanner`, `ConversationManager`, metrics, and an `AIPipeline` extensibility
+  seam. Talks to the diagram only through read/write **ports** (`DiagramContextSource` /
+  `DiagramGateway`).
+- **AI Diagram Generation** (`src/ai/generation`) — natural language → diagram. The LLM
+  emits a _semantic_ `DiagramPlan` only; the app validates it, lays it out
+  (`ExecutionPlanner` + `LayoutEngine`, dagre), and applies it through the runtime.
+  `MockPlanProvider` gives a no-API-key demo.
+- **Conversational Editing** (`src/ai/editing`) — the LLM emits a semantic `EditPlan` of
+  `ElementReference`s; a `ReferenceResolver` resolves them (ambiguity → clarification,
+  never a guess), an `EditExecutionPlanner` plans, and a preview → approve/reject gate
+  precedes a single-undo apply.
+- **AI Copilot experience** (`src/features/ai`) — a docked `AiSidebar` + `useAiCopilot`
+  hook: streaming stages, execution timeline, operation summary (from runtime patches),
+  history, prompt library, settings, retry/regenerate/cancel/restore.
+
+### Phase 4 · Module 1 — Diagram Understanding Engine _(done)_ · `src/ai/understanding`
+
+The AI can generate and edit; now it can **understand**. This module is a **compiler
+front-end**: it compiles the Diagram DSL ("source code") into a **Semantic Graph** (the
+intermediate representation) that every future understanding feature consumes _instead
+of_ the raw DSL.
+
+- **Semantic Graph (IR)** — immutable, strongly-typed `SemanticEntity` / `SemanticRelationship`
+  / `SemanticGroup` with an open, extensible kind vocabulary, precomputed adjacency +
+  secondary indexes (`GraphIndex`), and aggregate `GraphStats`. Two orthogonal axes kept
+  separate: the **relationship graph** and the **containment tree**.
+- **Graph analysis** — traversal, reachability, k-hop neighbourhood, shortest/all paths,
+  dependency chains, connected components, cycle detection, topological order, ancestors/
+  descendants, ranked search — all O(V+E), direction-aware, kind-filterable.
+- **Context extraction** — scope (whole / selection / entity / group / subgraph /
+  neighbourhood / path) → a compact, **token-budgeted**, relevance-ranked slice with
+  explicit truncation, rendered to a fenced-JSON block.
+- **Semantic summaries** — deterministic prose + digests (diagram/entity/group/selection/
+  subgraph/topology) that become prompt grounding.
+- **Query API** — `SemanticQuery`, the single clean surface future modules use.
+- **Incremental sync + caching** — identity-diffed incremental rebuilds (reclassify only
+  the delta, reuse unchanged objects by reference) driven off a `DiagramChangeSource`
+  port, with dependency-aware `RegionCache`s that invalidate _only changed regions_.
+- **Validation** — integrity checks over the IR (broken refs, circular ownership,
+  duplicate ids, …).
+
+**No user-facing AI features yet** — only the semantic foundation. See the module's
+**[README](./src/ai/understanding/README.md)** for the full design, decisions, and how it
+enables Explain Mode, Diagram Review, AI Insights, Smart Import, and multi-agent reasoning
+without further architectural change.
+
+---
 
 ## Tech stack
 
 **Frontend:** React · TypeScript (strict) · Vite · Tailwind · shadcn/ui (Radix) ·
-React Router · Zustand · TanStack Query · Excalidraw
+React Router · Zustand · TanStack Query · Excalidraw · zod · dagre
 
 **Backend:** FastAPI · SQLAlchemy 2 · PostgreSQL · Alembic (see `backend/`)
-
-## Running the full stack
-
-```bash
-# 1. Backend (see backend/README.md for details)
-cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-cp .env.example .env                 # set DATABASE_URL
-.venv/bin/alembic upgrade head
-.venv/bin/uvicorn app.main:app --port 8000
-
-# 2. Frontend (in another terminal) — /api is proxied to :8000
-npm install && npm run dev
-```
 
 ## Getting started
 
 ```bash
 npm install
-npm run dev        # start the dev server (http://localhost:5173)
+npm run dev        # dev server (http://localhost:5173)
 npm run build      # type-check + production build
 npm run typecheck  # strict type-check only
+npm run test       # vitest (watch)  ·  npm run test:run for CI
 npm run lint       # ESLint
 ```
 
-## What's included
+Full-stack (with the backend) instructions are in `backend/README.md`.
 
-- **Dashboard** (`/`) — header, search, sort, filter, grid/list toggle, recent
-  rail, project cards with an overflow menu (Open / Rename / Duplicate / Delete),
-  plus loading, empty, no-results, and error states.
-- **Project CRUD UI** — create / rename / delete dialogs and duplicate action,
-  wired through TanStack Query mutations against a mock service.
-- **Editor** (`/editor/:projectId`) — Excalidraw canvas with an engine-backed
-  toolbar (select, shapes, arrow, line, draw, text, image, hand, undo/redo,
-  zoom, fit), a live inspector, and a live status bar.
-- **Diagram editing** — draw, move, resize, rotate, group/ungroup, copy, paste,
-  duplicate, delete, pan, zoom, undo, redo — all native Excalidraw behavior.
-- **404** — catch-all route.
-- **Theming** — light / dark / system with persistence and no flash on load
-  (the canvas theme follows the app theme).
-- **Responsive** — desktop, tablet, and mobile (drawer sidebar).
+---
 
-## Architecture
+## Architecture at a glance
 
 ```
 src/
-├── app/          # providers, query client, router, theme bootstrap
-├── components/
-│   ├── ui/       # shadcn/Radix primitives (Button, Dialog, Select, …)
-│   ├── common/   # cross-feature shared components (SearchInput, EmptyState, …)
-│   ├── dashboard/ sidebar/ toolbar/ dialogs/ layout/
+├── app/ components/ pages/ hooks/ store/ services/ utils/   # Phase 1 app shell
 ├── features/
-│   └── canvas/   # the diagram engine feature (see below)
-│       ├── CanvasEngine.ts        # the abstraction (interface + contract)
-│       ├── adapters/              # ExcalidrawAdapter + tool/zoom/element maps
-│       ├── state/                 # useCanvasStore (Zustand snapshot)
-│       ├── context/               # CanvasProvider + context
-│       ├── hooks/                 # useCanvas (engine) + reactive selectors
-│       ├── components/            # Canvas host, Toolbar, Inspector, StatusBar
-│       └── types/                 # engine-agnostic canvas types
-├── hooks/        # data hooks (TanStack Query: projects, diagram, autosave) + UI
-├── pages/        # route components
-├── services/     # API client: apiClient, projectService, diagramApi
-├── store/        # Zustand stores: project, ui, theme, autosave
-├── types/        # shared TypeScript types
-└── utils/        # pure helpers (formatting, query, thumbnails, cn)
-
-backend/          # FastAPI + SQLAlchemy + PostgreSQL (see backend/README.md)
+│   ├── canvas/        # CanvasEngine abstraction over Excalidraw
+│   └── ai/            # AI Copilot experience (AiSidebar, useAiCopilot)
+├── dsl/               # the Diagram DSL — pure, immutable source of truth
+├── diagram-engine/    # rendering, live sync, runtime (mutation API + event bus)
+└── ai/                # the AI layer (talks to the diagram only through ports)
+    ├── core/ providers/ planning/ validation/ conversation/ pipeline/   # Foundation
+    ├── generation/    # NL → diagram
+    ├── editing/       # conversational editing
+    └── understanding/ # Diagram Understanding Engine (Phase 4 M1) — the Semantic Graph
 ```
 
-### The CanvasEngine abstraction
+### Key architectural decisions
 
-```
-UI / future AI modules  →  CanvasEngine (interface)  →  ExcalidrawAdapter  →  Excalidraw
-```
+- **The DSL is the single source of truth.** Everything — rendering, runtime, AI —
+  reads and writes the immutable `DiagramDocument`. It is renderer/backend/AI-agnostic
+  and _is_ the serialization format. The DB stores it as opaque JSONB.
+- **One mutation path.** All changes go through the `DiagramRuntime` (validate →
+  transaction → apply → commit → patch → history → events). Undo/redo, autosave, AI, and
+  understanding all hang off the same typed event stream — no duplicated mutation logic.
+- **The AI layer is decoupled by ports.** `@/ai` imports `@/dsl` for _types only_ and
+  reaches the live diagram through `DiagramContextSource` (read), `DiagramGateway`
+  (write), and `DiagramChangeSource` (change events). It never imports the runtime, the
+  canvas, Excalidraw, or React. The app wires the seams.
+- **The LLM emits _semantics_, never geometry or operations.** Generation produces a
+  semantic `DiagramPlan`; editing produces a semantic `EditPlan`; understanding consumes
+  a Semantic Graph. Deterministic app code owns layout, references, execution, and undo —
+  so a hallucinated field can't corrupt the document.
+- **Renderer independence is absolute across the AI layer.** No renderer concept appears
+  in generation, editing, or understanding. Swapping Excalidraw means writing one adapter.
+- **Immutability + structural sharing** makes incremental work and cache invalidation
+  correct: unchanged objects keep their identity, so diffs and cache keys are cheap.
+- **Every feature is an extensibility seam.** New AI capabilities register an
+  `IntentHandler` and read the Semantic Graph through `SemanticQuery` — the rest of the
+  pipeline already exists.
 
-`CanvasEngine` is the only surface the rest of the app touches. Excalidraw is
-imported **only** inside `adapters/` and the typed utils — never in UI code.
-Imperative commands (`setTool`, `zoomIn`, `undo`, `deleteSelected`, `fitToScreen`,
-…) go through `useCanvas()`; reactive state (selection, zoom, counts, history,
-cursor, readiness) is published by the adapter to `useCanvasStore` and read via
-narrow selector hooks. Swapping engines later means writing one new adapter — no
-UI changes.
+Deeper design docs live beside their code: **[ARCHITECTURE.md](./ARCHITECTURE.md)**,
+`src/dsl/README.md`, `src/diagram-engine/README.md`, `src/ai/ARCHITECTURE.md`,
+`src/ai/generation/GENERATION.md`, `src/ai/editing/EDITING.md`, and
+`src/ai/understanding/README.md`.
 
-### Persistence & autosave (Module 3)
-
-```
-Canvas change → sceneVersion↑ → debounce (1.2s) → dirty check → PUT /diagram → Saved
-```
-
-- **The canvas engine never knows SQL; the database never knows Excalidraw.**
-  The engine deals only in scenes. A pure serializer (`serializeScene` /
-  `documentToInitialData`, in the canvas feature) translates a scene ⇄ a
-  versioned `DiagramDocument`. The API sends that document as **opaque JSON**;
-  Postgres stores it as **JSONB**. Neither side is coupled to the other — and
-  the `schema`/`version` envelope is the seam for the Phase 2 Diagram-DSL
-  migration (add a new `schema`, no storage change).
-- **Autosave is timer/ref-driven, not render-driven.** `useAutosave` debounces
-  on scene-version changes, guards against no-ops (dirty check) and concurrent
-  requests (in-flight flag), retries with exponential backoff, and flushes when
-  connectivity returns. Status (`Saving…/Saved/Offline/failed`) lives in its own
-  `autosave` store, read by the top-bar indicator.
-- **Server state vs. client state stay separated.** Project + diagram *data*
-  live only in the TanStack Query cache; the `project` store holds view state
-  (search/sort/filter/dialogs) and the `autosave` store holds save status. The
-  diagram query uses `staleTime: Infinity` so a refocus never clobbers unsaved
-  edits — autosave is the single writer that keeps the cache current.
-- **Anti-corruption at the API edge.** The backend speaks `name`; the app speaks
-  `title`. The mapping lives in `projectService`, so components and hooks were
-  unchanged when the mock backend became a real one.
-- **Backend clean architecture:** routes → services → repositories → models,
-  with domain exceptions mapped to HTTP at the edge (details in `backend/`).
-- **Imperative vs. reactive canvas state are split.** The engine interface is
-  purely imperative (commands). All *observable* canvas state lives in a plain
-  Zustand store the adapter writes to — so the high-rate updates from drawing and
-  pointer-move re-render only the tiny subscribing panels, never the editor tree.
-- **Focused Zustand stores** (`project`, `ui`, `theme`, plus the canvas store in
-  its feature module) with no overlapping concerns; each persists only its
-  durable slice.
-- **`ui/` primitives vs. `common/` components.** `ui/` holds the design-system
-  primitives (the conventional shadcn location); `common/` holds app-specific
-  shared components composed from them.
-- **The editor route is code-split**, so Excalidraw (a large dependency) only
-  loads when a diagram is opened; the dashboard bundle stays lean.
-- **Reuse over duplication.** Card and list rows share `ProjectThumbnail`,
-  `ProjectActionsMenu`, and the `useProjectActions` hook; the sidebar shares one
-  `SidebarContent` between its desktop rail and mobile drawer; sort and filter
-  share a generic `OptionSelect`.
-- **Barrel exports** per feature folder keep imports clean and stable.
+---
 
 ## Roadmap
 
-**Phase 1 — Standalone editor (done).** Dashboard, editor, canvas engine,
-property editing, autosave, persistence, settings, polish.
+**Phase 1–3 (done)** — editor, DSL, engine/runtime, AI foundation, generation, editing,
+copilot UX.
 
-**Phase 2 — Diagram DSL + AI.** A Diagram DSL becomes the source of truth
-(stored in the same opaque `DiagramDocument`, so no backend change). AI features
-— natural-language → diagram, conversational editing, explanation, review —
-drive the editor through the existing `CanvasEngine` API. See
-[ARCHITECTURE.md](./ARCHITECTURE.md#phase-2-readiness) for the seams already in
-place.
+**Phase 4 · Module 1 (done)** — the Diagram Understanding Engine: the Semantic Graph and
+everything that reads it.
+
+**Phase 4+ (next)** — the understanding-powered, read-only capabilities that consume the
+Semantic Graph with **no changes to the engine**: **Explain Mode**, **Diagram Review**,
+**AI Insights**, then **Smart Import** and multi-agent reasoning.
