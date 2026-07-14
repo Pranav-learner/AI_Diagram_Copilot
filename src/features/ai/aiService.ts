@@ -20,21 +20,24 @@ import {
   OpenAIProvider,
   MockPlanProvider,
   MockEditProvider,
+  MockExplainProvider,
   mergeConfig,
 } from '@/ai';
 import type { AIProvider, ProviderCapabilities, ChatResponse, ResolvedRequest, StreamChunk, AIConfigOverride } from '@/ai';
 
 /**
- * A single mock provider that serves BOTH capabilities without a key: it inspects
- * the system prompt and routes to the plan mock (generation) or the edit mock
- * (editing). This mirrors a real provider — one endpoint, JSON shaped by the
- * prompt — so the rest of the app is identical with or without credentials.
+ * A single mock provider that serves ALL capabilities without a key: it inspects
+ * the system prompt and routes to the plan mock (generation), the edit mock
+ * (editing), or the explain mock (Explain Mode). This mirrors a real provider —
+ * one endpoint, JSON shaped by the prompt — so the rest of the app is identical
+ * with or without credentials.
  */
 class MockAssistantProvider implements AIProvider {
   readonly id = 'mock-assistant';
   readonly capabilities: ProviderCapabilities = { streaming: true, jsonMode: true, systemPrompt: true, maxContextTokens: 100_000 };
   private readonly plan = new MockPlanProvider();
   private readonly edit = new MockEditProvider();
+  private readonly explain = new MockExplainProvider();
 
   complete(request: ResolvedRequest, signal?: AbortSignal): Promise<ChatResponse> {
     return this.pick(request).complete(request, signal);
@@ -44,7 +47,9 @@ class MockAssistantProvider implements AIProvider {
   }
   private pick(request: ResolvedRequest): AIProvider {
     const system = request.messages.find((m) => m.role === 'system')?.content ?? '';
-    return /EditPlan/.test(system) ? this.edit : this.plan;
+    if (/Explain Mode/.test(system)) return this.explain;
+    if (/EditPlan/.test(system)) return this.edit;
+    return this.plan;
   }
 }
 

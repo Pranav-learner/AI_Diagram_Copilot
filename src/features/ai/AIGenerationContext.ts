@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { DiagramGenerator, DiagramEditor, DiagramContextSource, IntentAnalyzer, AIMetrics } from '@/ai';
+import type { DiagramGenerator, DiagramEditor, ExplainEngine, UnderstandingEngine, DiagramContextSource, IntentAnalyzer, AIMetrics } from '@/ai';
 import type { DiagramRuntime } from '@/diagram-engine';
 
 /**
@@ -11,6 +11,10 @@ import type { DiagramRuntime } from '@/diagram-engine';
 export interface AIGenerationContextValue {
   readonly generator: DiagramGenerator;
   readonly editor: DiagramEditor;
+  /** Explain Mode orchestrator (reads the Semantic Graph, never the DSL). */
+  readonly explain: ExplainEngine;
+  /** The Understanding Engine kept in sync with the live diagram. */
+  readonly understanding: UnderstandingEngine;
   readonly runtime: DiagramRuntime;
   readonly contextSource: DiagramContextSource;
   readonly intentAnalyzer: IntentAnalyzer;

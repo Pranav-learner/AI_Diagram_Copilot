@@ -1,8 +1,8 @@
-import { useMemo, type ReactNode } from 'react';
-import { DiagramGenerator, DiagramEditor, RuleBasedIntentAnalyzer } from '@/ai';
+import { useEffect, useMemo, type ReactNode } from 'react';
+import { DiagramGenerator, DiagramEditor, ExplainEngine, UnderstandingEngine, RuleBasedIntentAnalyzer } from '@/ai';
 import { useDiagramRuntime, useDiagramBridge } from '@/features/canvas';
 import { createRuntimeGateway } from '@/features/canvas/runtime/runtimeGateway';
-import { createRuntimeContextSource } from './runtimeContextSource';
+import { createRuntimeContextSource, createRuntimeChangeSource } from './runtimeContextSource';
 import { createEditorAIService } from './aiService';
 import { AIGenerationContext } from './AIGenerationContext';
 import { useAiSettingsStore, settingsToConfigOverride } from './store/useAiSettingsStore';
@@ -42,10 +42,15 @@ export function AIGenerationProvider({ children }: { children: ReactNode }) {
     const contextSource = createRuntimeContextSource(runtime, bridge);
     const generator = new DiagramGenerator({ service: bundle.service, gateway, stream: streaming });
     const editor = new DiagramEditor({ service: bundle.service, gateway, contextSource, stream: streaming });
+    // Understanding Engine kept in sync with the runtime; Explain Mode reads it.
+    const understanding = UnderstandingEngine.attach(createRuntimeChangeSource(runtime));
+    const explain = new ExplainEngine({ service: bundle.service, graphSource: understanding, stream: streaming });
     const intentAnalyzer = new RuleBasedIntentAnalyzer();
     return {
       generator,
       editor,
+      explain,
+      understanding,
       runtime,
       contextSource,
       intentAnalyzer,
@@ -56,6 +61,14 @@ export function AIGenerationProvider({ children }: { children: ReactNode }) {
       availableProviders: bundle.availableProviders,
     };
   }, [runtime, bridge, provider, model, temperature, maxTokens, streaming, promptVersion]);
+
+  // Release the previous Understanding/Explain subscriptions when the value rebuilds.
+  useEffect(() => {
+    return () => {
+      value.explain.dispose();
+      value.understanding.dispose();
+    };
+  }, [value]);
 
   return <AIGenerationContext.Provider value={value}>{children}</AIGenerationContext.Provider>;
 }

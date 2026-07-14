@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Sparkles,
   Wand2,
+  BookOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ import { StageList } from './StageList';
 import { OperationSummaryView } from './OperationSummaryView';
 import { ErrorCard } from './ErrorCard';
 import { ChangeBadge } from './ChangeBadge';
+import { ExplanationView } from './ExplanationView';
 
 /** One request/response in the conversation. */
 export function TurnCard({ turn, copilot, debug }: { turn: AiTurn; copilot: UseAiCopilot; debug: boolean }) {
@@ -41,7 +43,13 @@ export function TurnCard({ turn, copilot, debug }: { turn: AiTurn; copilot: UseA
         aria-busy={running}
       >
         <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          {turn.kind === 'generate' ? <Sparkles className="size-3.5 text-primary" /> : <Wand2 className="size-3.5 text-primary" />}
+          {turn.kind === 'generate' ? (
+            <Sparkles className="size-3.5 text-primary" />
+          ) : turn.kind === 'explain' ? (
+            <BookOpen className="size-3.5 text-primary" />
+          ) : (
+            <Wand2 className="size-3.5 text-primary" />
+          )}
           <Badge variant="secondary" className="px-1.5 py-0 text-[10px] capitalize">
             {turn.kind}
           </Badge>
@@ -99,8 +107,13 @@ export function TurnCard({ turn, copilot, debug }: { turn: AiTurn; copilot: UseA
           </div>
         )}
 
-        {/* Done */}
-        {turn.status === 'done' && (
+        {/* Done — explanation */}
+        {turn.status === 'done' && turn.kind === 'explain' && turn.explanation && (
+          <ExplanationView turnId={turn.id} explanation={turn.explanation} copilot={copilot} />
+        )}
+
+        {/* Done — generate/edit */}
+        {turn.status === 'done' && turn.kind !== 'explain' && (
           <div className="space-y-2">
             {turn.operationSummary && <OperationSummaryView summary={turn.operationSummary} />}
             {turn.warnings.length > 0 && <WarningLine warnings={turn.warnings} />}

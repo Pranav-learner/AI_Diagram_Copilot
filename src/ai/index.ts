@@ -67,3 +67,6 @@ export * from './editing';
 
 // ── Diagram Understanding Engine (Phase 4, Module 1) ─────────────────────────
 export * from './understanding';
+
+// ── Capability: Explain Mode (Phase 4, Module 2) ─────────────────────────────
+export * from './explain';

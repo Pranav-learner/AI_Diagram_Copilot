@@ -1,5 +1,5 @@
 import { useRef, type KeyboardEvent } from 'react';
-import { ArrowUp, BookMarked, Plus } from 'lucide-react';
+import { ArrowUp, BookMarked, Plus, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -58,6 +58,14 @@ export function PromptComposer({ copilot, onOpenLibrary }: { copilot: UseAiCopil
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Save prompt</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-7" onClick={() => copilot.explainSelection()} aria-label="Explain selection">
+                  <BookOpen className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Explain the selection (or whole diagram)</TooltipContent>
             </Tooltip>
           </div>
           <Button size="icon" className="size-7 rounded-full" onClick={() => copilot.send()} disabled={!copilot.draft.trim()} aria-label="Send">

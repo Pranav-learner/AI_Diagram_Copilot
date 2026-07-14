@@ -1,6 +1,6 @@
 import { useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { GENERATION_STAGES, EDIT_STAGES } from '@/ai';
-import type { EditProposal, Clarification, Candidate } from '@/ai';
+import { GENERATION_STAGES, EDIT_STAGES, EXPLAIN_STAGES } from '@/ai';
+import type { EditProposal, Clarification, Candidate, ExplanationSession, ExplainTarget, ExplainInput, ExplanationDepth } from '@/ai';
 
 /** Common shape of a generation/edit stage update (their `stage` unions differ). */
 interface StageUpdateLike {
@@ -43,12 +43,21 @@ export interface UseAiCopilot {
   clearConversation(): void;
   /** Whether a turn is the latest applied change (so "undo this" is meaningful). */
   canRestore(turnId: string): boolean;
+  // ── Explain Mode ──────────────────────────────────────────────────────────
+  /** Explain the current selection (or the whole diagram when nothing is selected). */
+  explainSelection(): void;
+  /** Explain one element by id (e.g. a related-element chip). */
+  explainElement(id: string): void;
+  /** Ask a follow-up scoped to an explanation turn's target + context. */
+  askFollowUp(turnId: string, question: string): void;
+  /** Re-explain an explanation turn's target at a different depth. */
+  changeDepth(turnId: string, depth: ExplanationDepth): void;
 }
 
 export function useAiCopilot(): UseAiCopilot {
   const ctx = useContext(AIGenerationContext);
   if (!ctx) throw new Error('useAiCopilot must be used within an <AIGenerationProvider>.');
-  const { generator, editor, intentAnalyzer, contextSource, runtime, provider, model, usingMock } = ctx;
+  const { generator, editor, explain, understanding, intentAnalyzer, contextSource, runtime, provider, model, usingMock } = ctx;
 
   const turns = useAiConversationStore((s) => s.turns);
   const store = useAiConversationStore;
@@ -58,6 +67,7 @@ export function useAiCopilot(): UseAiCopilot {
   const [draft, setDraft] = useState('');
   const controllers = useRef(new Map<string, AbortController>());
   const proposals = useRef(new Map<string, EditProposal>());
+  const sessions = useRef(new Map<string, ExplanationSession>());
 
   // ── Runtime patch capture (operation summary source) ─────────────────────────
   const beginCapture = useCallback(() => {
@@ -71,7 +81,7 @@ export function useAiCopilot(): UseAiCopilot {
   // ── Turn helpers ─────────────────────────────────────────────────────────────
   const makeObserver = useCallback(
     (turnId: string, kind: TurnKind) => {
-      const stageDefs = kind === 'generate' ? GENERATION_STAGES : EDIT_STAGES;
+      const stageDefs = kind === 'generate' ? GENERATION_STAGES : kind === 'explain' ? EXPLAIN_STAGES : EDIT_STAGES;
       const labelOf = (key: string) => stageDefs.find((s) => s.stage === key)?.label ?? key;
       return {
         onStage: (u: StageUpdateLike) =>
@@ -162,6 +172,77 @@ export function useAiCopilot(): UseAiCopilot {
     [editor, streaming, makeObserver, fail, store],
   );
 
+  // ── Run an explanation (or a follow-up) for a turn ───────────────────────────
+  const runExplain = useCallback(
+    async (turnId: string, input: ExplainInput, controller: AbortController) => {
+      const observer = makeObserver(turnId, 'explain');
+      try {
+        const result = await explain.explain({ ...input, signal: controller.signal, stream: streaming }, observer);
+        sessions.current.set(turnId, result.session);
+        complete(turnId, { status: 'done', explanation: result.explanation, planSummary: result.explanation.summary, tokens: result.usage });
+      } catch (err) {
+        fail(turnId, err);
+      } finally {
+        controllers.current.delete(turnId);
+      }
+    },
+    [explain, streaming, makeObserver, complete, fail],
+  );
+
+  const runFollowUp = useCallback(
+    async (turnId: string, session: ExplanationSession, question: string, controller: AbortController) => {
+      const observer = makeObserver(turnId, 'explain');
+      try {
+        const result = await explain.followUp(session, question, observer, controller.signal);
+        sessions.current.set(turnId, result.session);
+        complete(turnId, { status: 'done', explanation: result.explanation, planSummary: result.explanation.summary, tokens: result.usage });
+      } catch (err) {
+        fail(turnId, err);
+      } finally {
+        controllers.current.delete(turnId);
+      }
+    },
+    [explain, makeObserver, complete, fail],
+  );
+
+  /** Create + start an explain turn. Returns the turn id. */
+  const startExplain = useCallback(
+    (input: ExplainInput, promptLabel: string): string => {
+      const turnId = newId();
+      store.getState().addTurn({
+        id: turnId,
+        kind: 'explain',
+        prompt: promptLabel,
+        intent: 'explain',
+        createdAt: Date.now(),
+        status: 'streaming',
+        stages: [{ key: 'intent', label: 'Intent', state: 'done', detail: 'explain' }],
+        streamingText: '',
+        warnings: [],
+        provider,
+        model,
+        baseVersion: runtime.getVersion(),
+      });
+      const controller = new AbortController();
+      controllers.current.set(turnId, controller);
+      void runExplain(turnId, input, controller);
+      return turnId;
+    },
+    [store, provider, model, runtime, runExplain],
+  );
+
+  const targetLabel = useCallback(
+    (target: ExplainTarget): string => {
+      const q = understanding.query();
+      if (target.kind === 'node') return `Explain ${q.getEntity(target.id)?.label ?? 'element'}`;
+      if (target.kind === 'group' || target.kind === 'container') return `Explain ${q.getGroup(target.id)?.label ?? 'group'}`;
+      if (target.kind === 'diagram') return 'Explain the whole diagram';
+      if (target.kind === 'selection') return `Explain the selection (${target.ids.length})`;
+      return 'Explain';
+    },
+    [understanding],
+  );
+
   // ── Public API ───────────────────────────────────────────────────────────────
   const send = useCallback(
     async (promptArg?: string) => {
@@ -173,7 +254,12 @@ export function useAiCopilot(): UseAiCopilot {
       const hasDiagram = Object.keys(doc.nodes).length > 0;
       const selection = contextSource.getSelection?.() ?? [];
       const classification = await intentAnalyzer.analyze({ text: prompt, hasDiagram, hasSelection: selection.length > 0 });
-      const kind: TurnKind = !hasDiagram || classification.intent === 'generate' ? 'generate' : 'edit';
+      const kind: TurnKind =
+        !hasDiagram || classification.intent === 'generate'
+          ? 'generate'
+          : classification.intent === 'explain'
+            ? 'explain'
+            : 'edit';
 
       const turnId = newId();
       const turn: AiTurn = {
@@ -196,9 +282,64 @@ export function useAiCopilot(): UseAiCopilot {
       const controller = new AbortController();
       controllers.current.set(turnId, controller);
       if (kind === 'generate') void runGeneration(turnId, prompt, controller, false);
-      else void runEdit(turnId, prompt, controller, false);
+      else if (kind === 'explain') {
+        const target: ExplainTarget =
+          selection.length === 1 ? { kind: 'node', id: selection[0]! } : selection.length > 1 ? { kind: 'selection', ids: selection } : { kind: 'diagram' };
+        void runExplain(turnId, { target, question: prompt }, controller);
+      } else void runEdit(turnId, prompt, controller, false);
     },
-    [draft, contextSource, intentAnalyzer, provider, model, runtime, store, runGeneration, runEdit],
+    [draft, contextSource, intentAnalyzer, provider, model, runtime, store, runGeneration, runEdit, runExplain],
+  );
+
+  const explainSelection = useCallback(() => {
+    const selection = contextSource.getSelection?.() ?? [];
+    const target: ExplainTarget =
+      selection.length === 1 ? { kind: 'node', id: selection[0]! } : selection.length > 1 ? { kind: 'selection', ids: selection } : { kind: 'diagram' };
+    startExplain({ target }, targetLabel(target));
+  }, [contextSource, startExplain, targetLabel]);
+
+  const explainElement = useCallback(
+    (id: string) => {
+      const target: ExplainTarget = understanding.query().getGroup(id) ? { kind: 'group', id } : { kind: 'node', id };
+      startExplain({ target }, targetLabel(target));
+    },
+    [understanding, startExplain, targetLabel],
+  );
+
+  const askFollowUp = useCallback(
+    (turnId: string, question: string) => {
+      const session = sessions.current.get(turnId);
+      if (!session) return;
+      const newTurnId = newId();
+      store.getState().addTurn({
+        id: newTurnId,
+        kind: 'explain',
+        prompt: question,
+        intent: 'explain',
+        createdAt: Date.now(),
+        status: 'streaming',
+        stages: [{ key: 'intent', label: 'Intent', state: 'done', detail: 'follow-up' }],
+        streamingText: '',
+        warnings: [],
+        provider,
+        model,
+        baseVersion: runtime.getVersion(),
+      });
+      const controller = new AbortController();
+      controllers.current.set(newTurnId, controller);
+      void runFollowUp(newTurnId, session, question, controller);
+    },
+    [store, provider, model, runtime, runFollowUp],
+  );
+
+  const changeDepth = useCallback(
+    (turnId: string, depth: ExplanationDepth) => {
+      const session = sessions.current.get(turnId);
+      if (!session) return;
+      const target = session.request.target;
+      startExplain({ target, depth }, `${targetLabel(target)} (${depth})`);
+    },
+    [startExplain, targetLabel],
   );
 
   const approve = useCallback(
@@ -284,15 +425,22 @@ export function useAiCopilot(): UseAiCopilot {
   const retry = useCallback(
     (turnId: string) => {
       const turn = turnById(turnId);
-      if (turn) void send(turn.prompt);
+      if (!turn) return;
+      if (turn.kind === 'explain') {
+        const session = sessions.current.get(turnId);
+        if (session) startExplain({ target: session.request.target, depth: session.request.depth }, targetLabel(session.request.target));
+        return;
+      }
+      void send(turn.prompt);
     },
-    [turnById, send],
+    [turnById, send, startExplain, targetLabel],
   );
 
   const regenerate = useCallback(
     (turnId: string) => {
       const turn = turnById(turnId);
       if (!turn) return;
+      if (turn.kind === 'explain') return retry(turnId);
       // Undo this turn's change first (if it's still the latest) so we don't stack.
       if (canRestore(turnId)) runtime.undo();
       const prompt = turn.prompt;
@@ -317,7 +465,7 @@ export function useAiCopilot(): UseAiCopilot {
       if (turn.kind === 'generate') void runGeneration(newTurnId, prompt, controller, true);
       else void runEdit(newTurnId, prompt, controller, true);
     },
-    [turnById, canRestore, runtime, provider, model, store, runGeneration, runEdit],
+    [turnById, retry, canRestore, runtime, provider, model, store, runGeneration, runEdit],
   );
 
   const editPrompt = useCallback(
@@ -341,6 +489,7 @@ export function useAiCopilot(): UseAiCopilot {
     for (const c of controllers.current.values()) c.abort();
     controllers.current.clear();
     proposals.current.clear();
+    sessions.current.clear();
     store.getState().clear();
   }, [store]);
 
@@ -363,8 +512,12 @@ export function useAiCopilot(): UseAiCopilot {
       cancel,
       clearConversation,
       canRestore,
+      explainSelection,
+      explainElement,
+      askFollowUp,
+      changeDepth,
     }),
-    [turns, draft, usingMock, provider, model, send, approve, reject, chooseCandidate, retry, regenerate, editPrompt, restore, cancel, clearConversation, canRestore],
+    [turns, draft, usingMock, provider, model, send, approve, reject, chooseCandidate, retry, regenerate, editPrompt, restore, cancel, clearConversation, canRestore, explainSelection, explainElement, askFollowUp, changeDepth],
   );
 }
 

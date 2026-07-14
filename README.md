@@ -96,6 +96,31 @@ of_ the raw DSL.
 enables Explain Mode, Diagram Review, AI Insights, Smart Import, and multi-agent reasoning
 without further architectural change.
 
+### Phase 4 · Module 2 — Explain Mode _(done)_ · `src/ai/explain`
+
+The first capability built on the Semantic Graph. Click any node, relationship,
+group, path, or selection and get a mentor-grade explanation that adapts to the
+element, its surroundings, the detected **domain**, the **audience** (beginner /
+intermediate / expert), the **style** (business / technical / educational), and the
+**depth** (overview / detailed). Ask scoped follow-ups; explore graph-derived
+related elements and suggested questions.
+
+- **Reasons only over the Semantic Graph + Context View** — never the DSL or a
+  renderer. The pipeline is `plan → context → prompt → LLM → validate → format`,
+  each stage independent.
+- **The `ExplanationPlanner`** resolves the target, detects the domain, picks
+  depth/audience/style, and maps the target to a compact `ContextScope` — so the
+  LLM sees a focused, token-budgeted slice, never the whole diagram.
+- **The model returns prose only**; related elements and suggested questions are
+  derived deterministically from the graph (never hallucinated).
+- **Region-aware explanation cache** invalidates only the parts touched by an edit;
+  **read-only** throughout (no mutation). Works with **zero config** via a heuristic
+  mock provider. Delivered in the copilot sidebar as a per-turn explanation panel
+  with markdown, related-element chips, follow-ups, and a depth toggle.
+
+See **[src/ai/explain/README.md](./src/ai/explain/README.md)** for the full design and
+how it prepares Diagram Review and AI Insights.
+
 ---
 
 ## Tech stack
@@ -176,6 +201,9 @@ copilot UX.
 **Phase 4 · Module 1 (done)** — the Diagram Understanding Engine: the Semantic Graph and
 everything that reads it.
 
-**Phase 4+ (next)** — the understanding-powered, read-only capabilities that consume the
-Semantic Graph with **no changes to the engine**: **Explain Mode**, **Diagram Review**,
-**AI Insights**, then **Smart Import** and multi-agent reasoning.
+**Phase 4 · Module 2 (done)** — **Explain Mode**: click-to-explain any element, adapted to
+domain / audience / depth, with follow-ups — the first capability on the Semantic Graph.
+
+**Phase 4+ (next)** — the remaining understanding-powered, read-only capabilities that
+consume the Semantic Graph with **no changes to the engine**: **Diagram Review**, **AI
+Insights**, then **Smart Import** and multi-agent reasoning.
