@@ -175,6 +175,34 @@ repository, ranking algorithm, lifecycle, and how it becomes the reasoning layer
 Smart Import, Reverse Engineering, multi-agent collaboration, and enterprise
 intelligence.
 
+### Phase 5 · Module 1 — Document Intelligence Engine / PKM _(done)_ · `src/ai/knowledge`
+
+The first stage of the **Project Knowledge Model (PKM)** — a professional
+knowledge-ingestion pipeline that turns unstructured documents into structured
+knowledge. It does not generate diagrams or parse code; it is the knowledge
+foundation every future document-facing feature consumes.
+
+- **Structured Document Model** — a deterministic, dependency-free Markdown/text parser
+  produces a renderer-independent IR (headings, sections, lists, tables, code,
+  callouts, links, references) where every element has a unique id, position,
+  hierarchy, and metadata.
+- **Deterministic knowledge extraction** (no LLM) — entity, relationship, requirement,
+  decision, and statement (goals/risks/constraints/assumptions) extractors emit
+  evidence-backed, confidence-scored knowledge.
+- **Project Knowledge Model** — merges extracted knowledge from all documents into one
+  deduplicated, connected, fully-traceable graph; **incremental and reversible at
+  document granularity** (`removeDocument` withdraws exactly one document's
+  contributions).
+- **Classification, indexing, search, summaries** — document-type + category taxonomy,
+  precomputed PKM + incremental full-text indexes, unified keyword/entity/tag/category/
+  relationship/document search, and deterministic digests; region-aware caching and
+  validation throughout.
+
+**No user-facing import yet** — only the knowledge foundation. See
+**[src/ai/knowledge/README.md](./src/ai/knowledge/README.md)** for the model, the
+extraction pipeline, and how the PKM will support Reverse Engineering, Smart Import,
+Repository Analysis, AI Documentation, and multi-agent workflows.
+
 ---
 
 ## Tech stack
@@ -264,6 +292,10 @@ Semantic Graph discovers findings and computes scores; the AI explains them.
 **Phase 4 · Module 4 (done)** — **Diagram Intelligence Engine**: the proactive reasoning
 layer — a stateful finding repository, ranked insight feed, timeline, and briefing.
 
-**Phase 4+ (next)** — the enterprise capabilities this reasoning layer was built to
-support: **Smart Import**, **Reverse Engineering**, Architecture Intelligence, and
-multi-agent collaboration.
+**Phase 5 · Module 1 (done)** — **Document Intelligence Engine / PKM**: unstructured
+documents → Structured Document Model → deterministic knowledge extraction → Project
+Knowledge Model.
+
+**Phase 5+ (next)** — the document-powered capabilities the PKM was built to support:
+**Smart Import** (PKM → Diagram Planner → DSL), **Reverse Engineering**, Repository
+Analysis, AI Documentation, and multi-agent workflows.

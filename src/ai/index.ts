@@ -76,3 +76,6 @@ export * from './review';
 
 // ── Capability: Diagram Intelligence Engine (Phase 4, Module 4) ──────────────
 export * from './intelligence';
+
+// ── Capability: Document Intelligence Engine / PKM (Phase 5, Module 1) ────────
+export * from './knowledge';
