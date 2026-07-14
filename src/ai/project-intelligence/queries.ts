@@ -9,6 +9,7 @@
  */
 
 import type { Evidence, PimEntity, PimRelation, ProjectIntelligenceModel } from './pim/ProjectIntelligenceModel';
+import { defaultOntology } from '../knowledge/ontology/ProjectOntology';
 
 export type PimDirection = 'out' | 'in' | 'both';
 
@@ -75,13 +76,20 @@ export class PimQuery {
 
   /** Requirements related to (or implemented by) the entity. */
   findRequirements(idOrName: string): PimEntity[] {
+    return this.findRelatedByOntologyType(idOrName, 'Requirement');
+  }
+
+  /** Find entities related to this one by their ontology type (supporting inheritance) */
+  findRelatedByOntologyType(idOrName: string, ontologyType: string): PimEntity[] {
     const e = this.resolve(idOrName);
     if (!e) return [];
     const out = new Map<string, PimEntity>();
     for (const r of [...this.pim.incoming(e.id), ...this.pim.outgoing(e.id)]) {
       const otherId = r.source === e.id ? r.target : r.source;
       const other = this.pim.getEntity(otherId);
-      if (other && other.kind === 'requirement') out.set(otherId, other);
+      if (other && (other.ontologyType === ontologyType || defaultOntology.isSubconceptOf(other.ontologyType, ontologyType))) {
+        out.set(otherId, other);
+      }
     }
     return [...out.values()];
   }

@@ -50,6 +50,7 @@ export interface KnowledgeEntity {
   readonly id: string;
   readonly name: string;
   readonly kind: EntityKind;
+  readonly ontologyType: string;
   readonly category: KnowledgeCategory;
   /** Alternative surface forms merged into this entity. */
   readonly aliases: readonly string[];
@@ -62,6 +63,12 @@ export interface KnowledgeEntity {
   /** Distinct origin documents (fast "which docs mention this"). */
   readonly documentIds: readonly string[];
   readonly attributes: Readonly<Record<string, string | number | boolean>>;
+  readonly relationships?: readonly {
+    readonly id: string;
+    readonly targetId: string;
+    readonly kind: string;
+    readonly attributes?: Readonly<Record<string, string | number | boolean>>;
+  }[];
 }
 
 /** The canonical id for an entity of a given kind + name. */

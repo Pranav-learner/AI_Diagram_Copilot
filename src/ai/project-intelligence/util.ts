@@ -13,7 +13,7 @@ export function slug(text: string): string {
  * "User Service v2" all collapse to `user service`.
  */
 export function canonicalKey(name: string): string {
-  return name
+  const base = name
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
     .replace(/[_./\\-]+/g, ' ')
@@ -26,6 +26,36 @@ export function canonicalKey(name: string): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+
+  // Enhanced resolution: pluralization and suffix normalization
+  const words = base.split(' ');
+  const normalizedWords = words.map((w) => {
+    let word = w;
+    if (word.endsWith('ies')) {
+      word = word.slice(0, -3) + 'y';
+    } else if (word.endsWith('es') && !word.endsWith('aes') && !word.endsWith('ees') && !word.endsWith('oes') && !word.endsWith('sues')) {
+      if (word.endsWith('sses')) {
+        word = word.slice(0, -2);
+      } else {
+        word = word.slice(0, -1);
+      }
+    } else if (word.endsWith('s') && !word.endsWith('ss') && !word.endsWith('us') && !word.endsWith('is') && !word.endsWith('as')) {
+      word = word.slice(0, -1);
+    }
+    return word;
+  });
+
+  // Strip trailing suffixes like 'impl', 'base', 'interface' if there's more than one word.
+  while (normalizedWords.length > 1) {
+    const last = normalizedWords[normalizedWords.length - 1];
+    if (last === 'impl' || last === 'base' || last === 'interface') {
+      normalizedWords.pop();
+    } else {
+      break;
+    }
+  }
+
+  return normalizedWords.join(' ');
 }
 
 /** Extract a version token from a name/attributes, if present. */

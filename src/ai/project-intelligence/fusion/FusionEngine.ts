@@ -10,6 +10,7 @@
  */
 
 import type { KnowledgeCategory, ProjectKnowledgeModel } from '../../knowledge';
+import { OntologyMapper } from '../../knowledge/ontology/OntologyMapper';
 import { ProjectIntelligenceModel, type Evidence, type PimEntity, type PimEntityKind, type PimRelation, type PimRelationKind } from '../pim/ProjectIntelligenceModel';
 import { resolveEntities, type EntityCluster } from './EntityResolver';
 import { mergeEvidence, relationEvidence, inferenceEvidence } from './EvidenceMerger';
@@ -122,6 +123,7 @@ function buildEntity(cluster: EntityCluster): PimEntity {
     id: cluster.id,
     name: cluster.canonicalName,
     kind: pimKind(cluster.kind),
+    ontologyType: OntologyMapper.mapKind(pimKind(cluster.kind)),
     category,
     aliases: [...aliases],
     tags: [...tags],

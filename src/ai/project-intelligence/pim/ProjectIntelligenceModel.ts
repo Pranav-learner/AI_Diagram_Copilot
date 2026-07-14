@@ -12,6 +12,7 @@
  */
 
 import type { KnowledgeCategory } from '../../knowledge';
+import { defaultOntology } from '../../knowledge/ontology/ProjectOntology';
 
 /** Which kind of artifact a piece of knowledge came from. Open for future sources. */
 export type SourceKind = 'document' | 'code' | 'infrastructure' | 'api' | 'database' | 'diagram' | 'inference' | (string & {});
@@ -73,6 +74,7 @@ export interface PimEntity {
   readonly id: string;
   readonly name: string;
   readonly kind: PimEntityKind;
+  readonly ontologyType: string;
   readonly category: KnowledgeCategory;
   readonly aliases: readonly string[];
   readonly tags: readonly string[];
@@ -89,6 +91,12 @@ export interface PimEntity {
   readonly inferred?: boolean;
   /** The PKM entity ids fused into this PIM entity (traceability). */
   readonly pkmIds: readonly string[];
+  readonly relationships?: readonly {
+    readonly id: string;
+    readonly targetId: string;
+    readonly kind: string;
+    readonly attributes?: Readonly<Record<string, string | number | boolean>>;
+  }[];
 }
 
 export type PimRelationKind =
@@ -158,6 +166,7 @@ export class ProjectIntelligenceModel {
   readonly version: number;
 
   private readonly byKindIndex = new Map<string, string[]>();
+  private readonly byOntologyTypeIndex = new Map<string, string[]>();
   private readonly byCategoryIndex = new Map<string, string[]>();
   private readonly byTagIndex = new Map<string, string[]>();
   private readonly bySourceKindIndex = new Map<string, string[]>();
@@ -181,6 +190,7 @@ export class ProjectIntelligenceModel {
     };
     for (const e of entities) {
       push(this.byKindIndex, e.kind, e.id);
+      if (e.ontologyType) push(this.byOntologyTypeIndex, e.ontologyType, e.id);
       push(this.byCategoryIndex, e.category, e.id);
       for (const t of e.tags) push(this.byTagIndex, t.toLowerCase(), e.id);
       for (const s of e.sourceKinds) push(this.bySourceKindIndex, s, e.id);
@@ -193,13 +203,14 @@ export class ProjectIntelligenceModel {
 
   // ── Access ────────────────────────────────────────────────────────────────────
   getEntity(id: string): PimEntity | undefined {
-    return this.entityMap.get(id);
+    const e = this.entityMap.get(id);
+    return e ? this.attachRelationships(e) : undefined;
   }
   getRelation(id: string): PimRelation | undefined {
     return this.relationMap.get(id);
   }
   entities(): readonly PimEntity[] {
-    return [...this.entityMap.values()];
+    return [...this.entityMap.keys()].map((id) => this.getEntity(id)!);
   }
   relations(): readonly PimRelation[] {
     return [...this.relationMap.values()];
@@ -210,20 +221,30 @@ export class ProjectIntelligenceModel {
   /** The PIM entity a PKM entity was fused into. */
   resolvePkm(pkmId: string): PimEntity | undefined {
     const id = this.pkmToPim.get(pkmId);
-    return id ? this.entityMap.get(id) : undefined;
+    return id ? this.getEntity(id) : undefined;
   }
 
   byKind(kind: PimEntityKind): PimEntity[] {
-    return (this.byKindIndex.get(kind) ?? []).map((id) => this.entityMap.get(id)!);
+    return (this.byKindIndex.get(kind) ?? []).map((id) => this.getEntity(id)!);
+  }
+  byOntologyType(ontologyType: string): PimEntity[] {
+    const descendants = defaultOntology.getDescendants(ontologyType);
+    const allTypes = [ontologyType, ...descendants];
+    const ids = new Set<string>();
+    for (const type of allTypes) {
+      const matchIds = this.byOntologyTypeIndex.get(type) ?? this.byOntologyTypeIndex.get(type.toLowerCase()) ?? [];
+      for (const id of matchIds) ids.add(id);
+    }
+    return [...ids].map((id) => this.getEntity(id)!);
   }
   byCategory(category: KnowledgeCategory): PimEntity[] {
-    return (this.byCategoryIndex.get(category) ?? []).map((id) => this.entityMap.get(id)!);
+    return (this.byCategoryIndex.get(category) ?? []).map((id) => this.getEntity(id)!);
   }
   byTag(tag: string): PimEntity[] {
-    return (this.byTagIndex.get(tag.toLowerCase()) ?? []).map((id) => this.entityMap.get(id)!);
+    return (this.byTagIndex.get(tag.toLowerCase()) ?? []).map((id) => this.getEntity(id)!);
   }
   bySourceKind(sourceKind: SourceKind): PimEntity[] {
-    return (this.bySourceKindIndex.get(sourceKind) ?? []).map((id) => this.entityMap.get(id)!);
+    return (this.bySourceKindIndex.get(sourceKind) ?? []).map((id) => this.getEntity(id)!);
   }
 
   /** Relations leaving an entity. */
@@ -237,7 +258,29 @@ export class ProjectIntelligenceModel {
 
   findByName(name: string): PimEntity | undefined {
     const norm = name.trim().toLowerCase();
-    return this.entities().find((e) => e.name.toLowerCase() === norm || e.aliases.some((a) => a.toLowerCase() === norm));
+    const match = [...this.entityMap.values()].find((e) => e.name.toLowerCase() === norm || e.aliases.some((a) => a.toLowerCase() === norm));
+    return match ? this.getEntity(match.id) : undefined;
+  }
+
+  private attachRelationships(e: PimEntity): PimEntity {
+    const rels = [
+      ...this.outgoing(e.id).map((r) => ({
+        id: r.id,
+        targetId: r.target,
+        kind: r.kind,
+        attributes: { confidence: r.confidence }
+      })),
+      ...this.incoming(e.id).map((r) => ({
+        id: r.id,
+        targetId: r.source,
+        kind: r.kind,
+        attributes: { confidence: r.confidence }
+      }))
+    ];
+    return {
+      ...e,
+      relationships: rels
+    };
   }
 
   stats(): PimStats {

@@ -22,6 +22,7 @@ import { relationId } from './KnowledgeRelation';
 import type { ExtractionResult } from '../extractors/types';
 import { classifyEntityKind } from '../extractors/types';
 import { normalizeTerm } from '../util';
+import { OntologyMapper } from '../ontology/OntologyMapper';
 
 type Mut<T> = { -readonly [K in keyof T]: T[K] };
 type MutEntity = Mut<KnowledgeEntity> & { sourceKeys: Set<string>; documents: Set<string> };
@@ -132,13 +133,14 @@ export class ProjectKnowledgeModel {
   // ── Queries ─────────────────────────────────────────────────────────────────
 
   getEntity(id: string): KnowledgeEntity | undefined {
-    return this.entityMap.get(id);
+    const ent = this.entityMap.get(id);
+    return ent ? this.attachRelationships(ent) : undefined;
   }
   getRelation(id: string): KnowledgeRelation | undefined {
     return this.relationMap.get(id);
   }
   entities(): readonly KnowledgeEntity[] {
-    return [...this.entityMap.values()];
+    return [...this.entityMap.values()].map((e) => this.attachRelationships(e));
   }
   relations(): readonly KnowledgeRelation[] {
     return [...this.relationMap.values()];
@@ -154,7 +156,7 @@ export class ProjectKnowledgeModel {
   find(name: string, kind?: EntityKind): KnowledgeEntity | undefined {
     const k = kind ?? classifyEntityKind(name);
     const id = this.aliasIndex.get(mergeKey(name, k)) ?? this.aliasIndex.get(mergeKey(name, 'concept'));
-    return id ? this.entityMap.get(id) : undefined;
+    return id ? this.getEntity(id) : undefined;
   }
 
   byKind(kind: EntityKind): KnowledgeEntity[] {
@@ -165,7 +167,20 @@ export class ProjectKnowledgeModel {
   }
   byDocument(documentId: string): KnowledgeEntity[] {
     const ids = this.byDoc.get(documentId);
-    return ids ? [...ids].map((id) => this.entityMap.get(id)).filter((e): e is MutEntity => !!e) : [];
+    return ids ? [...ids].map((id) => this.getEntity(id)).filter((e): e is KnowledgeEntity => !!e) : [];
+  }
+
+  private attachRelationships(ent: MutEntity): KnowledgeEntity {
+    const rels = this.relationsOf(ent.id).map((r) => ({
+      id: r.id,
+      targetId: r.source === ent.id ? r.target : r.source,
+      kind: r.kind,
+      attributes: { confidence: r.confidence, mentions: r.mentions }
+    }));
+    return {
+      ...ent,
+      relationships: rels
+    };
   }
 
   /** Relations touching an entity, and the connected entities. */
@@ -210,6 +225,7 @@ export class ProjectKnowledgeModel {
       id,
       name,
       kind,
+      ontologyType: OntologyMapper.mapKind(kind),
       category,
       aliases: [],
       tags: [],
@@ -245,7 +261,10 @@ export class ProjectKnowledgeModel {
     for (const t of tags ?? []) addUnique(ent.tags as string[], t);
     if (attributes) ent.attributes = { ...ent.attributes, ...attributes };
     // Upgrade a generic concept to a more specific named kind.
-    if (ent.kind === 'concept' && kind !== 'concept' && NAMED_KINDS.has(kind)) ent.kind = kind;
+    if (ent.kind === 'concept' && kind !== 'concept' && NAMED_KINDS.has(kind)) {
+      ent.kind = kind;
+      ent.ontologyType = OntologyMapper.mapKind(kind);
+    }
     if (ent.category === 'general' && category && category !== 'general') ent.category = category;
   }
 

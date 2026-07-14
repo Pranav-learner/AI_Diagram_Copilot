@@ -14,6 +14,7 @@
 
 import { ProjectKnowledgeModel, type DocumentRef } from '../knowledge';
 import type { NormalizedAST } from './ast/NormalizedAST';
+import { UIRDocument, astToUIR } from './uir/UIR';
 import { defaultParserRegistry, ParserRegistry } from './parsers';
 import type { ParseResult } from './parsers/types';
 import { buildCodeKnowledgeGraph } from './analysis';
@@ -47,6 +48,7 @@ export class ReverseEngineeringEngine {
 
   private readonly files = new Map<string, { content: string; hash: string }>();
   private readonly asts = new Map<string, NormalizedAST>();
+  private readonly uirDocs = new Map<string, UIRDocument>();
   private readonly parseErrors = new Map<string, readonly string[]>();
   private readonly parseCache = new Map<string, ParseResult>();
   private readonly sliceHashes = new Map<string, string>();
@@ -86,9 +88,11 @@ export class ReverseEngineeringEngine {
     this.files.set(file, { content, hash });
     if (result.ok && result.ast) {
       this.asts.set(file, result.ast);
+      this.uirDocs.set(file, astToUIR(result.ast));
       this.parseErrors.delete(file);
     } else {
       this.asts.delete(file);
+      this.uirDocs.delete(file);
       this.parseErrors.set(file, result.errors);
     }
     this.dirty = true;
@@ -110,6 +114,7 @@ export class ReverseEngineeringEngine {
     if (!this.files.has(file)) return;
     this.files.delete(file);
     this.asts.delete(file);
+    this.uirDocs.delete(file);
     this.parseErrors.delete(file);
     this.dirty = true;
   }
@@ -143,7 +148,7 @@ export class ReverseEngineeringEngine {
 
   validate(): RepoValidationReport {
     this.ensureBuilt();
-    return validateRepository({ asts: [...this.asts.values()], parseErrors: this.parseErrors, graph: this.graph! });
+    return validateRepository({ uirDocs: [...this.uirDocs.values()], parseErrors: this.parseErrors, graph: this.graph! });
   }
 
   stats(): RepoStats {
@@ -161,6 +166,7 @@ export class ReverseEngineeringEngine {
     for (const docId of this.sliceHashes.keys()) this.pkm.removeDocument(docId);
     this.files.clear();
     this.asts.clear();
+    this.uirDocs.clear();
     this.parseErrors.clear();
     this.sliceHashes.clear();
     this.graph = undefined;
@@ -172,7 +178,7 @@ export class ReverseEngineeringEngine {
 
   private ensureBuilt(): void {
     if (!this.dirty) return;
-    this.graph = buildCodeKnowledgeGraph([...this.asts.values()]);
+    this.graph = buildCodeKnowledgeGraph([...this.uirDocs.values()]);
     this.syncPkm(this.graph);
     this.dirty = false;
     this._version++;

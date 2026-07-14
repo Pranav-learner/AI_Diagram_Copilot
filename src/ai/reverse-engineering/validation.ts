@@ -7,6 +7,8 @@
  */
 
 import type { NormalizedAST } from './ast/NormalizedAST';
+import { astToUIR } from './uir/UIR';
+import type { UIRDocument } from './uir/UIR';
 import type { CodeKnowledgeGraph } from './graph/CodeKnowledgeGraph';
 
 export type RepoIssueSeverity = 'error' | 'warning';
@@ -27,7 +29,8 @@ export interface RepoValidationReport {
 }
 
 export interface ValidationInput {
-  readonly asts: readonly NormalizedAST[];
+  readonly uirDocs?: readonly UIRDocument[];
+  readonly asts?: readonly NormalizedAST[];
   readonly parseErrors: ReadonlyMap<string, readonly string[]>;
   readonly graph: CodeKnowledgeGraph;
 }
@@ -38,8 +41,9 @@ export function validateRepository(input: ValidationInput): RepoValidationReport
   for (const [file, errors] of input.parseErrors) {
     for (const message of errors) issues.push({ code: 'parser-failure', severity: 'error', file, message });
   }
-  for (const ast of input.asts) {
-    for (const message of ast.warnings) issues.push({ code: 'parse-warning', severity: 'warning', file: ast.file, message });
+  const docs = input.uirDocs ?? input.asts?.map(astToUIR) ?? [];
+  for (const doc of docs) {
+    for (const message of doc.warnings) issues.push({ code: 'parse-warning', severity: 'warning', file: doc.file, message });
   }
   for (const r of input.graph.relations()) {
     if (!input.graph.hasEntity(r.source)) issues.push({ code: 'dangling-relation', severity: 'error', entityId: r.source, message: `Relation "${r.id}" has a missing source.` });
