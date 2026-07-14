@@ -1,5 +1,5 @@
 import { useEffect, useMemo, type ReactNode } from 'react';
-import { DiagramGenerator, DiagramEditor, ExplainEngine, UnderstandingEngine, RuleBasedIntentAnalyzer } from '@/ai';
+import { DiagramGenerator, DiagramEditor, ExplainEngine, ReviewEngine, UnderstandingEngine, RuleBasedIntentAnalyzer } from '@/ai';
 import { useDiagramRuntime, useDiagramBridge } from '@/features/canvas';
 import { createRuntimeGateway } from '@/features/canvas/runtime/runtimeGateway';
 import { createRuntimeContextSource, createRuntimeChangeSource } from './runtimeContextSource';
@@ -42,15 +42,18 @@ export function AIGenerationProvider({ children }: { children: ReactNode }) {
     const contextSource = createRuntimeContextSource(runtime, bridge);
     const generator = new DiagramGenerator({ service: bundle.service, gateway, stream: streaming });
     const editor = new DiagramEditor({ service: bundle.service, gateway, contextSource, stream: streaming });
-    // Understanding Engine kept in sync with the runtime; Explain Mode reads it.
+    // Understanding Engine kept in sync with the runtime; Explain + Review read it.
     const understanding = UnderstandingEngine.attach(createRuntimeChangeSource(runtime));
     const explain = new ExplainEngine({ service: bundle.service, graphSource: understanding, stream: streaming });
+    const review = new ReviewEngine({ service: bundle.service, graphSource: understanding, stream: streaming });
     const intentAnalyzer = new RuleBasedIntentAnalyzer();
     return {
       generator,
       editor,
       explain,
+      review,
       understanding,
+      selectEntities: (ids: readonly string[]) => bridge.setSelection(ids),
       runtime,
       contextSource,
       intentAnalyzer,
@@ -62,10 +65,11 @@ export function AIGenerationProvider({ children }: { children: ReactNode }) {
     };
   }, [runtime, bridge, provider, model, temperature, maxTokens, streaming, promptVersion]);
 
-  // Release the previous Understanding/Explain subscriptions when the value rebuilds.
+  // Release the previous Understanding/Explain/Review subscriptions on rebuild.
   useEffect(() => {
     return () => {
       value.explain.dispose();
+      value.review.dispose();
       value.understanding.dispose();
     };
   }, [value]);

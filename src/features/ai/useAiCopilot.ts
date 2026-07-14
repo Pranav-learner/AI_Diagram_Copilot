@@ -1,6 +1,6 @@
 import { useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { GENERATION_STAGES, EDIT_STAGES, EXPLAIN_STAGES } from '@/ai';
-import type { EditProposal, Clarification, Candidate, ExplanationSession, ExplainTarget, ExplainInput, ExplanationDepth } from '@/ai';
+import { GENERATION_STAGES, EDIT_STAGES, EXPLAIN_STAGES, REVIEW_STAGES } from '@/ai';
+import type { EditProposal, Clarification, Candidate, ExplanationSession, ExplainTarget, ExplainInput, ExplanationDepth, ReviewInput } from '@/ai';
 
 /** Common shape of a generation/edit stage update (their `stage` unions differ). */
 interface StageUpdateLike {
@@ -52,12 +52,17 @@ export interface UseAiCopilot {
   askFollowUp(turnId: string, question: string): void;
   /** Re-explain an explanation turn's target at a different depth. */
   changeDepth(turnId: string, depth: ExplanationDepth): void;
+  // ── Diagram Review ────────────────────────────────────────────────────────
+  /** Review the whole diagram (or the current selection). */
+  reviewDiagram(): void;
+  /** Highlight a finding's affected elements on the canvas. */
+  focusFinding(ids: readonly string[]): void;
 }
 
 export function useAiCopilot(): UseAiCopilot {
   const ctx = useContext(AIGenerationContext);
   if (!ctx) throw new Error('useAiCopilot must be used within an <AIGenerationProvider>.');
-  const { generator, editor, explain, understanding, intentAnalyzer, contextSource, runtime, provider, model, usingMock } = ctx;
+  const { generator, editor, explain, review, understanding, selectEntities, intentAnalyzer, contextSource, runtime, provider, model, usingMock } = ctx;
 
   const turns = useAiConversationStore((s) => s.turns);
   const store = useAiConversationStore;
@@ -81,7 +86,8 @@ export function useAiCopilot(): UseAiCopilot {
   // ── Turn helpers ─────────────────────────────────────────────────────────────
   const makeObserver = useCallback(
     (turnId: string, kind: TurnKind) => {
-      const stageDefs = kind === 'generate' ? GENERATION_STAGES : kind === 'explain' ? EXPLAIN_STAGES : EDIT_STAGES;
+      const stageDefs =
+        kind === 'generate' ? GENERATION_STAGES : kind === 'explain' ? EXPLAIN_STAGES : kind === 'review' ? REVIEW_STAGES : EDIT_STAGES;
       const labelOf = (key: string) => stageDefs.find((s) => s.stage === key)?.label ?? key;
       return {
         onStage: (u: StageUpdateLike) =>
@@ -243,6 +249,52 @@ export function useAiCopilot(): UseAiCopilot {
     [understanding],
   );
 
+  // ── Run a diagram review for a turn ──────────────────────────────────────────
+  const runReview = useCallback(
+    async (turnId: string, input: ReviewInput, controller: AbortController) => {
+      const observer = makeObserver(turnId, 'review');
+      try {
+        const result = await review.review({ ...input, signal: controller.signal, stream: streaming }, observer);
+        complete(turnId, {
+          status: 'done',
+          review: result.review,
+          planSummary: `${result.review.scores.overall.label}: ${result.review.scores.overall.score}/100 · ${result.review.counts.total} finding(s)`,
+          tokens: result.usage,
+        });
+      } catch (err) {
+        fail(turnId, err);
+      } finally {
+        controllers.current.delete(turnId);
+      }
+    },
+    [review, streaming, makeObserver, complete, fail],
+  );
+
+  const startReview = useCallback(
+    (input: ReviewInput, promptLabel: string): string => {
+      const turnId = newId();
+      store.getState().addTurn({
+        id: turnId,
+        kind: 'review',
+        prompt: promptLabel,
+        intent: 'review',
+        createdAt: Date.now(),
+        status: 'streaming',
+        stages: [{ key: 'intent', label: 'Intent', state: 'done', detail: 'review' }],
+        streamingText: '',
+        warnings: [],
+        provider,
+        model,
+        baseVersion: runtime.getVersion(),
+      });
+      const controller = new AbortController();
+      controllers.current.set(turnId, controller);
+      void runReview(turnId, input, controller);
+      return turnId;
+    },
+    [store, provider, model, runtime, runReview],
+  );
+
   // ── Public API ───────────────────────────────────────────────────────────────
   const send = useCallback(
     async (promptArg?: string) => {
@@ -259,7 +311,9 @@ export function useAiCopilot(): UseAiCopilot {
           ? 'generate'
           : classification.intent === 'explain'
             ? 'explain'
-            : 'edit';
+            : classification.intent === 'review'
+              ? 'review'
+              : 'edit';
 
       const turnId = newId();
       const turn: AiTurn = {
@@ -286,10 +340,20 @@ export function useAiCopilot(): UseAiCopilot {
         const target: ExplainTarget =
           selection.length === 1 ? { kind: 'node', id: selection[0]! } : selection.length > 1 ? { kind: 'selection', ids: selection } : { kind: 'diagram' };
         void runExplain(turnId, { target, question: prompt }, controller);
+      } else if (kind === 'review') {
+        void runReview(turnId, { ...(selection.length > 0 ? { scope: { kind: 'selection', ids: selection } } : {}), request: prompt }, controller);
       } else void runEdit(turnId, prompt, controller, false);
     },
-    [draft, contextSource, intentAnalyzer, provider, model, runtime, store, runGeneration, runEdit, runExplain],
+    [draft, contextSource, intentAnalyzer, provider, model, runtime, store, runGeneration, runEdit, runExplain, runReview],
   );
+
+  const reviewDiagram = useCallback(() => {
+    const selection = contextSource.getSelection?.() ?? [];
+    const scoped = selection.length > 0;
+    startReview(scoped ? { scope: { kind: 'selection', ids: selection } } : {}, scoped ? `Review ${selection.length} selected element(s)` : 'Review the whole diagram');
+  }, [contextSource, startReview]);
+
+  const focusFinding = useCallback((ids: readonly string[]) => selectEntities(ids), [selectEntities]);
 
   const explainSelection = useCallback(() => {
     const selection = contextSource.getSelection?.() ?? [];
@@ -440,7 +504,7 @@ export function useAiCopilot(): UseAiCopilot {
     (turnId: string) => {
       const turn = turnById(turnId);
       if (!turn) return;
-      if (turn.kind === 'explain') return retry(turnId);
+      if (turn.kind === 'explain' || turn.kind === 'review') return retry(turnId);
       // Undo this turn's change first (if it's still the latest) so we don't stack.
       if (canRestore(turnId)) runtime.undo();
       const prompt = turn.prompt;
@@ -516,8 +580,10 @@ export function useAiCopilot(): UseAiCopilot {
       explainElement,
       askFollowUp,
       changeDepth,
+      reviewDiagram,
+      focusFinding,
     }),
-    [turns, draft, usingMock, provider, model, send, approve, reject, chooseCandidate, retry, regenerate, editPrompt, restore, cancel, clearConversation, canRestore, explainSelection, explainElement, askFollowUp, changeDepth],
+    [turns, draft, usingMock, provider, model, send, approve, reject, chooseCandidate, retry, regenerate, editPrompt, restore, cancel, clearConversation, canRestore, explainSelection, explainElement, askFollowUp, changeDepth, reviewDiagram, focusFinding],
   );
 }
 

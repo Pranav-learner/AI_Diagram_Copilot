@@ -70,3 +70,6 @@ export * from './understanding';
 
 // ── Capability: Explain Mode (Phase 4, Module 2) ─────────────────────────────
 export * from './explain';
+
+// ── Capability: Diagram Review (Phase 4, Module 3) ───────────────────────────
+export * from './review';

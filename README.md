@@ -121,6 +121,32 @@ related elements and suggested questions.
 See **[src/ai/explain/README.md](./src/ai/explain/README.md)** for the full design and
 how it prepares Diagram Review and AI Insights.
 
+### Phase 4 · Module 3 — Diagram Review _(done)_ · `src/ai/review`
+
+A professional static-analysis platform for diagrams — **the application discovers
+issues; the AI explains them.** A deterministic rule engine runs over the Semantic
+Graph and produces structured, traceable findings and transparent scores *before* any
+LLM call; the model only interprets. If the model is unavailable, the review degrades
+gracefully to findings + scores.
+
+- **Pluggable rule engine** (ESLint-for-diagrams): ~20 independently-testable rules
+  across software (SPOF via articulation points, missing gateway/auth/cache, coupling,
+  bottlenecks, dead services, observability, separation of concerns), business flows
+  (dead-ends, missing start/end, unreachable steps, missing approval), education
+  (flat structure), and universal structure (cycles, disconnected, isolated).
+- **Strongly-typed, traceable `Finding`s** (rule id, severity, confidence, affected
+  entities, evidence, recommendation) and **transparent scoring** — every scorecard
+  carries a rationale; dimensions adapt to the domain (architecture score,
+  scalability, security, … / process efficiency / completeness) plus a computed
+  complexity score. Strengths are derived deterministically too.
+- **Static analysis precedes the LLM**; results are **deterministic**, region-cached,
+  and **degrade gracefully**. Findings highlight affected elements on the canvas on
+  click. Delivered in the copilot sidebar with scorecards, grouped findings, strengths,
+  and priority actions.
+
+See **[src/ai/review/README.md](./src/ai/review/README.md)** for the rule engine,
+scoring model, and how it prepares AI Insights and Architecture Intelligence.
+
 ---
 
 ## Tech stack
@@ -204,6 +230,9 @@ everything that reads it.
 **Phase 4 · Module 2 (done)** — **Explain Mode**: click-to-explain any element, adapted to
 domain / audience / depth, with follow-ups — the first capability on the Semantic Graph.
 
-**Phase 4+ (next)** — the remaining understanding-powered, read-only capabilities that
-consume the Semantic Graph with **no changes to the engine**: **Diagram Review**, **AI
-Insights**, then **Smart Import** and multi-agent reasoning.
+**Phase 4 · Module 3 (done)** — **Diagram Review**: a deterministic rule engine over the
+Semantic Graph discovers findings and computes scores; the AI explains them.
+
+**Phase 4+ (next)** — the remaining understanding-powered capabilities that consume the
+Semantic Graph with **no changes to the engine**: **AI Insights**, then **Smart Import**,
+Architecture Intelligence, and multi-agent reasoning.

@@ -11,6 +11,7 @@ import {
   Sparkles,
   Wand2,
   BookOpen,
+  ClipboardCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,7 @@ import { OperationSummaryView } from './OperationSummaryView';
 import { ErrorCard } from './ErrorCard';
 import { ChangeBadge } from './ChangeBadge';
 import { ExplanationView } from './ExplanationView';
+import { ReviewView } from './ReviewView';
 
 /** One request/response in the conversation. */
 export function TurnCard({ turn, copilot, debug }: { turn: AiTurn; copilot: UseAiCopilot; debug: boolean }) {
@@ -47,6 +49,8 @@ export function TurnCard({ turn, copilot, debug }: { turn: AiTurn; copilot: UseA
             <Sparkles className="size-3.5 text-primary" />
           ) : turn.kind === 'explain' ? (
             <BookOpen className="size-3.5 text-primary" />
+          ) : turn.kind === 'review' ? (
+            <ClipboardCheck className="size-3.5 text-primary" />
           ) : (
             <Wand2 className="size-3.5 text-primary" />
           )}
@@ -112,8 +116,11 @@ export function TurnCard({ turn, copilot, debug }: { turn: AiTurn; copilot: UseA
           <ExplanationView turnId={turn.id} explanation={turn.explanation} copilot={copilot} />
         )}
 
+        {/* Done — review */}
+        {turn.status === 'done' && turn.kind === 'review' && turn.review && <ReviewView review={turn.review} copilot={copilot} />}
+
         {/* Done — generate/edit */}
-        {turn.status === 'done' && turn.kind !== 'explain' && (
+        {turn.status === 'done' && turn.kind !== 'explain' && turn.kind !== 'review' && (
           <div className="space-y-2">
             {turn.operationSummary && <OperationSummaryView summary={turn.operationSummary} />}
             {turn.warnings.length > 0 && <WarningLine warnings={turn.warnings} />}

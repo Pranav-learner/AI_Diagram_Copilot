@@ -8,11 +8,11 @@
  * business logic.
  */
 
-import type { EditPreview, Clarification, TokenUsage, FormattedExplanation } from '@/ai';
+import type { EditPreview, Clarification, TokenUsage, FormattedExplanation, FormattedReview } from '@/ai';
 import type { OperationSummary } from './lib/operationSummary';
 import type { HumanError } from './lib/humanizeError';
 
-export type TurnKind = 'generate' | 'edit' | 'explain';
+export type TurnKind = 'generate' | 'edit' | 'explain' | 'review';
 
 export type TurnStatus =
   | 'streaming'
@@ -50,6 +50,8 @@ export interface AiTurn {
   readonly preview?: EditPreview;
   /** Present on `explain` turns: the formatted explanation to render. */
   readonly explanation?: FormattedExplanation;
+  /** Present on `review` turns: the formatted review to render. */
+  readonly review?: FormattedReview;
   readonly error?: HumanError;
   readonly provider: string;
   readonly model: string;
