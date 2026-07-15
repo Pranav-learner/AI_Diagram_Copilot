@@ -121,3 +121,22 @@ export * from './orchestrator/progress/ProgressTracker';
 export * from './orchestrator/events/OrchestratorEvents';
 export * from './orchestrator/policies/ExecutionPolicies';
 
+// ── Specialist Agents Framework (Phase 6, Module 3) ─────────────────────────
+export * from './agents/contracts/AgentManifest';
+export * from './agents/contracts/AgentContract';
+export * from './agents/contracts/AgentRegistry';
+export * from './agents/contracts/AgentValidator';
+export * from './agents/specialists/BaseSpecialistAgent';
+export * from './agents/specialists/ArchitectureAgent';
+export * from './agents/specialists/DiagramAgent';
+export * from './agents/specialists/DocumentationAgent';
+export * from './agents/specialists/RepositoryAgent';
+export * from './agents/specialists/SecurityAgent';
+export * from './agents/specialists/PerformanceAgent';
+export * from './agents/specialists/DatabaseAgent';
+export * from './agents/specialists/DevOpsAgent';
+export * from './agents/specialists/BackendAgent';
+export * from './agents/specialists/FrontendAgent';
+export * from './agents/specialists/TestingAgent';
+export * from './agents/specialists/ReviewerAgent';
+
