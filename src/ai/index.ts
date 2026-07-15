@@ -140,3 +140,12 @@ export * from './agents/specialists/FrontendAgent';
 export * from './agents/specialists/TestingAgent';
 export * from './agents/specialists/ReviewerAgent';
 
+// ── Autonomous Engineering System Missions (Phase 6, Module 4) ──────────────
+export * from './missions/Mission';
+export * from './missions/MissionContext';
+export * from './missions/MissionPlanner';
+export * from './missions/MissionValidator';
+export * from './missions/MissionDashboard';
+export * from './missions/MissionHistory';
+export * from './missions/coordination/MissionCoordinator';
+export * from './missions/coordination/MissionAggregator';
