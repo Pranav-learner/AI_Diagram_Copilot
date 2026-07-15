@@ -85,3 +85,22 @@ export * from './reverse-engineering';
 
 // ── Project Intelligence Engine / PIM (Phase 5, Module 3) ─────────────────────
 export * from './project-intelligence';
+
+// ── AI Execution Framework (Phase 6, Module 1) ───────────────────────────────
+export * from './execution/ExecutionFramework';
+export * from './execution/ExecutionContext';
+export * from './execution/ExecutionUnit';
+export * from './execution/ExecutionLifecycle';
+export * from './execution/ExecutionManager';
+export * from './execution/ExecutionRegistry';
+export * from './execution/ExecutionState';
+export * from './capabilities/CapabilityDescriptor';
+export * from './capabilities/CapabilityRegistry';
+export * from './tools/Tool';
+export * from './tools/ToolRegistry';
+export * from './events/ExecutionEvent';
+export * from './events/EventBus';
+export * from './permissions/PermissionSystem';
+export * from './plugins/Plugin';
+export * from './plugins/PluginManager';
+
