@@ -104,3 +104,20 @@ export * from './permissions/PermissionSystem';
 export * from './plugins/Plugin';
 export * from './plugins/PluginManager';
 
+// ── Execution Graph & Orchestration (Phase 6, Module 2) ──────────────────────
+export * from './execution-graph/SharedPlanningModel';
+export * from './execution-graph/ExecutionNode';
+export * from './execution-graph/ExecutionEdge';
+export * from './execution-graph/ExecutionGraph';
+export * from './execution-graph/ExecutionCompiler';
+export * from './execution-graph/ExecutionValidator';
+export * from './orchestrator/ExecutionOrchestrator';
+export * from './orchestrator/Scheduler';
+export * from './orchestrator/ResourceManager';
+export * from './orchestrator/CheckpointManager';
+export * from './orchestrator/FailureManager';
+export * from './orchestrator/ApprovalManager';
+export * from './orchestrator/progress/ProgressTracker';
+export * from './orchestrator/events/OrchestratorEvents';
+export * from './orchestrator/policies/ExecutionPolicies';
+
