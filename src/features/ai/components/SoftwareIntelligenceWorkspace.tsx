@@ -22,6 +22,7 @@ import {
   FolderUp,
   Download,
   Flame,
+  Loader2,
 } from 'lucide-react';
 import { useProjectIntelligenceStore } from '../store/useProjectIntelligenceStore';
 import { SAMPLE_PROJECTS } from '../store/sampleRepositories';
@@ -99,6 +100,7 @@ export function SoftwareIntelligenceWorkspace() {
   const store = useProjectIntelligenceStore();
   const context = useContext(AIGenerationContext);
   const generator = context?.generator;
+  const runtime = context?.runtime;
 
   // UI view selectors
   const [centerTab, setCenterTab] = useState<'explorer' | 'map' | 'missions'>('explorer');
@@ -107,6 +109,8 @@ export function SoftwareIntelligenceWorkspace() {
   const [expandedEntity, setExpandedEntity] = useState<string | null>(null);
   const [hoveredEntity, setHoveredEntity] = useState<string | null>(null);
   const [selectedViewType, setSelectedViewType] = useState<ArchitectureViewType>('architecture');
+  const [mapViewMode, setMapViewMode] = useState<'flow' | 'grid'>('flow');
+  const [isGeneratingDiagram, setIsGeneratingDiagram] = useState(false);
 
   // Custom file upload state
   const [customFileCount, setCustomFileCount] = useState(0);
@@ -308,20 +312,57 @@ Instructions:
   };
 
   const handleGenerateDiagram = async () => {
-    if (!store.pim) return;
+    let currentPim = store.pim;
+
+    // Self-heal PIM if files are loaded but PIM not yet compiled
+    if (!currentPim) {
+      if (store.files && store.files.length > 0) {
+        setIsGeneratingDiagram(true);
+        try {
+          await store.importFiles(store.files, store.activeProjectId || 'custom');
+          currentPim = useProjectIntelligenceStore.getState().pim;
+        } catch (err: any) {
+          setIsGeneratingDiagram(false);
+          alert(`Failed to compile architecture model: ${err.message}`);
+          return;
+        }
+      } else {
+        alert('Please load a project or sample repository first to build the architecture model.');
+        return;
+      }
+    }
+
+    if (!currentPim) {
+      setIsGeneratingDiagram(false);
+      alert('Architecture model is not ready yet. Please wait for ingestion to complete.');
+      return;
+    }
+
+    setIsGeneratingDiagram(true);
 
     try {
-      const plan = pimToDiagramPlan(store.pim, { viewType: selectedViewType });
-      if (generator) {
-        localStorage.removeItem('pending_generated_plan');
+      const plan = pimToDiagramPlan(currentPim, { viewType: selectedViewType });
+
+      if (generator && runtime) {
+        // Clear any old canvas nodes so the fresh 5-tier architecture renders cleanly
+        const doc = runtime.getDocument();
+        const existingNodeIds = Object.keys(doc.nodes);
+        if (existingNodeIds.length > 0) {
+          runtime.transaction(
+            () => {
+              for (const nid of existingNodeIds) {
+                runtime.executeType('node.delete', { id: nid });
+              }
+            },
+            { label: 'Clear canvas for new architecture diagram', origin: 'program' }
+          );
+        }
+
+        // Apply clean 5-tier diagram plan to runtime
+        generator.applyPlan(plan);
+
+        // Switch to canvas tab immediately
         store.setActiveTab('canvas');
-        setTimeout(() => {
-          try {
-            generator.applyPlan(plan);
-          } catch (err: any) {
-            console.error('Failed to apply diagram plan:', err);
-          }
-        }, 50);
       } else {
         localStorage.setItem('pending_generated_plan', JSON.stringify(plan));
 
@@ -332,14 +373,10 @@ Instructions:
           if (projects && projects.length > 0) {
             targetId = projects[0]!.id;
           } else {
-            const newProj = await projectService.create({
-              title: `${store.activeProjectId || 'Repository'} Architecture`,
-              description: 'Auto-generated from Project Intelligence Model',
-            });
-            targetId = newProj.id;
+            targetId = '6d0c8d3f992c4c4696bee74abcccad03';
           }
         } catch (err) {
-          console.warn('Could not query/create project, falling back to seed project ID', err);
+          console.warn('Could not query project, falling back to seed project ID', err);
           targetId = '6d0c8d3f992c4c4696bee74abcccad03';
         }
 
@@ -348,6 +385,8 @@ Instructions:
     } catch (e: any) {
       console.error('Failed to auto-generate diagram on canvas', e);
       alert(`Error generating diagram: ${e.message}`);
+    } finally {
+      setIsGeneratingDiagram(false);
     }
   };
 
@@ -679,11 +718,22 @@ Instructions:
                 <option value="api">API Endpoints</option>
               </select>
               <button
+                type="button"
                 onClick={handleGenerateDiagram}
-                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow transition-all hover:bg-primary/95"
+                disabled={isGeneratingDiagram}
+                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow transition-all hover:bg-primary/95 disabled:opacity-50"
               >
-                <Sparkles className="size-3.5" />
-                Generate Diagram
+                {isGeneratingDiagram ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="size-3.5" />
+                    Generate Diagram
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -792,66 +842,226 @@ Instructions:
               </div>
             </div>
           ) : centerTab === 'map' ? (
-            // Capability Map & Dependency Viewer
+            // Capability Map & Tiered Architecture Topology Viewer
             <div className="space-y-6">
-              <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-4 border border-primary/20 text-xs">
-                <Info className="size-4 text-primary shrink-0" />
-                <p className="leading-relaxed">
-                  <strong>Downstream Blast Radius:</strong> Hover over any service node to highlight all downstream
-                  components impacted by API changes or outage. Click <strong>Generate Diagram</strong> above to render
-                  the model visual layout.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {store.pim?.entities().map((entity) => {
-                  const isHovered = hoveredEntity === entity.id;
-                  const isImpacted = blastRadiusIds.includes(entity.id);
-
-                  return (
-                    <div
-                      key={entity.id}
-                      onMouseEnter={() => setHoveredEntity(entity.id)}
-                      onMouseLeave={() => setHoveredEntity(null)}
-                      className={`relative flex flex-col justify-between rounded-xl border p-4 transition-all ${
-                        isHovered
-                          ? 'border-primary bg-primary/5 shadow-md scale-[1.01]'
-                          : isImpacted
-                          ? 'border-amber-500/50 bg-amber-500/10'
-                          : 'bg-background hover:border-muted-foreground/30'
+              {/* Header and View Mode Toggle */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border bg-card p-4">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Interactive Architecture Flow</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Structured multi-tier component hierarchy and downstream blast radius
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-lg border bg-muted/40 p-0.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setMapViewMode('flow')}
+                      className={`rounded-md px-3 py-1 font-medium transition-all ${
+                        mapViewMode === 'flow'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                            {entity.ontologyType}
-                          </span>
-                          <span className="text-[10px] font-mono font-bold text-primary">
-                            {(entity.confidence * 100).toFixed(0)}%
+                      Tiered Flow View
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMapViewMode('grid')}
+                      className={`rounded-md px-3 py-1 font-medium transition-all ${
+                        mapViewMode === 'grid'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      All Entities Grid
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {mapViewMode === 'flow' ? (
+                // Clean Tiered Architecture Flow
+                <div className="space-y-6">
+                  {[
+                    {
+                      tierIndex: 0,
+                      label: 'Client Ingress & Application Entrypoint',
+                      badge: 'Tier 1 • Gateway / Entrypoint',
+                      color: 'border-blue-500/30 bg-blue-500/5 text-blue-400',
+                      match: (e: any) =>
+                        e.name === 'main' ||
+                        e.name.includes('app') ||
+                        e.kind === 'gateway' ||
+                        (e.ontologyType || '').includes('Gateway'),
+                    },
+                    {
+                      tierIndex: 1,
+                      label: 'API Routers & Controllers',
+                      badge: 'Tier 2 • Controllers',
+                      color: 'border-cyan-500/30 bg-cyan-500/5 text-cyan-400',
+                      match: (e: any) =>
+                        e.name.includes('router') ||
+                        e.name.includes('controller') ||
+                        e.kind === 'router' ||
+                        (e.ontologyType || '').includes('Router'),
+                    },
+                    {
+                      tierIndex: 2,
+                      label: 'Business Logic & Domain Services',
+                      badge: 'Tier 3 • Domain Services',
+                      color: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-400',
+                      match: (e: any) =>
+                        (e.name.includes('service') || e.kind === 'service' || (e.ontologyType || '').includes('Service')) &&
+                        !e.name.includes('router'),
+                    },
+                    {
+                      tierIndex: 3,
+                      label: 'Data Repositories & Access Layer',
+                      badge: 'Tier 4 • Repositories',
+                      color: 'border-amber-500/30 bg-amber-500/5 text-amber-400',
+                      match: (e: any) =>
+                        e.name.includes('repository') ||
+                        e.name.includes('dao') ||
+                        e.kind === 'repository' ||
+                        (e.ontologyType || '').includes('Repository'),
+                    },
+                    {
+                      tierIndex: 4,
+                      label: 'Persistence Engine & Data Models',
+                      badge: 'Tier 5 • Database / Storage',
+                      color: 'border-purple-500/30 bg-purple-500/5 text-purple-400',
+                      match: (e: any) =>
+                        e.kind === 'database' ||
+                        (e.ontologyType || '').includes('Database') ||
+                        (e.ontologyType || '').includes('Table') ||
+                        (e.ontologyType || '').includes('Model') ||
+                        e.name.includes('model') ||
+                        e.name === 'database',
+                    },
+                  ].map((layer, idx) => {
+                    const matchingEntities = (store.pim?.entities() || []).filter(
+                      (e) =>
+                        layer.match(e) &&
+                        !['fastapi', 'pydantic', 'sqlalchemy', 'alembic', 'pytest', 'typing'].includes(e.name.toLowerCase()),
+                    );
+
+                    if (matchingEntities.length === 0) return null;
+
+                    return (
+                      <div key={layer.tierIndex} className="space-y-3">
+                        <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-md border px-2 py-0.5 text-[11px] font-semibold ${layer.color}`}>
+                              {layer.badge}
+                            </span>
+                            <span className="text-xs font-medium text-foreground">{layer.label}</span>
+                          </div>
+                          <span className="text-[11px] font-mono text-muted-foreground">
+                            {matchingEntities.length} component{matchingEntities.length === 1 ? '' : 's'}
                           </span>
                         </div>
-                        <h4 className="font-bold text-sm mt-1">{entity.name}</h4>
-                        {entity.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{entity.description}</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {matchingEntities.map((entity) => {
+                            const isHovered = hoveredEntity === entity.id;
+                            const isImpacted = blastRadiusIds.includes(entity.id);
+
+                            return (
+                              <div
+                                key={entity.id}
+                                onMouseEnter={() => setHoveredEntity(entity.id)}
+                                onMouseLeave={() => setHoveredEntity(null)}
+                                className={`rounded-xl border p-3.5 transition-all cursor-default ${
+                                  isHovered
+                                    ? 'border-primary bg-primary/10 shadow-lg scale-[1.02]'
+                                    : isImpacted
+                                    ? 'border-amber-500/60 bg-amber-500/10 shadow-sm'
+                                    : 'border-border bg-card/60 hover:border-primary/40'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-mono font-bold uppercase text-primary">
+                                    {entity.ontologyType || entity.kind}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-medium text-muted-foreground">
+                                    {((entity.confidence || 0.9) * 100).toFixed(0)}% conf
+                                  </span>
+                                </div>
+                                <h4 className="font-semibold text-sm mt-1 text-foreground">{entity.name}</h4>
+                                {entity.description && (
+                                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                    {entity.description}
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {idx < 4 && (
+                          <div className="flex items-center justify-center py-1 text-muted-foreground">
+                            <span className="text-xs font-mono text-muted-foreground/60 flex items-center gap-1.5">
+                              ↓ calls downstream dependencies ↓
+                            </span>
+                          </div>
                         )}
                       </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                // All Entities Blast Radius Grid
+                <div className="grid grid-cols-2 gap-4">
+                  {store.pim?.entities().map((entity) => {
+                    const isHovered = hoveredEntity === entity.id;
+                    const isImpacted = blastRadiusIds.includes(entity.id);
 
-                      {isHovered && blastRadiusIds.length > 0 && (
-                        <div className="mt-3 border-t pt-2 text-[10px] text-muted-foreground font-mono">
-                          <span className="font-bold text-primary">Blast Radius Impact:</span>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {blastRadiusIds.map((id) => (
-                              <span key={id} className="rounded bg-muted px-1.5 py-0.5">
-                                {id}
-                              </span>
-                            ))}
+                    return (
+                      <div
+                        key={entity.id}
+                        onMouseEnter={() => setHoveredEntity(entity.id)}
+                        onMouseLeave={() => setHoveredEntity(null)}
+                        className={`relative flex flex-col justify-between rounded-xl border p-4 transition-all ${
+                          isHovered
+                            ? 'border-primary bg-primary/5 shadow-md scale-[1.01]'
+                            : isImpacted
+                            ? 'border-amber-500/50 bg-amber-500/10'
+                            : 'bg-background hover:border-muted-foreground/30'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                              {entity.ontologyType}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-primary">
+                              {(entity.confidence * 100).toFixed(0)}%
+                            </span>
                           </div>
+                          <h4 className="font-bold text-sm mt-1">{entity.name}</h4>
+                          {entity.description && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{entity.description}</p>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+
+                        {isHovered && blastRadiusIds.length > 0 && (
+                          <div className="mt-3 border-t pt-2 text-[10px] text-muted-foreground font-mono">
+                            <span className="font-bold text-primary">Blast Radius Impact:</span>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {blastRadiusIds.map((id) => (
+                                <span key={id} className="rounded bg-muted px-1.5 py-0.5">
+                                  {id}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : (
             // Autonomous Engineering Missions

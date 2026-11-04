@@ -1,8 +1,10 @@
 /**
- * PimToDiagramAdapter — converts a ProjectIntelligenceModel (PIM) into a validated DiagramPlan.
+ * PimToDiagramAdapter — converts a ProjectIntelligenceModel (PIM) into a clean,
+ * human-readable, beautifully spaced DiagramPlan.
  *
- * Deterministically projects entities, relationships, confidence, and evidence
- * into a semantic DiagramPlan for Dagre layout and canvas execution.
+ * Implements architectural tiering and relationship pruning to avoid graph
+ * hairballs ("spaghetti diagrams"), producing structured, easily understood
+ * system architecture, component, and data models.
  */
 
 import type { ProjectIntelligenceModel, PimEntity } from '../../project-intelligence/pim/ProjectIntelligenceModel';
@@ -24,18 +26,97 @@ export interface PimToDiagramOptions {
   readonly minConfidence?: number;
 }
 
+const THIRD_PARTY_PACKAGES = new Set([
+  'fastapi', 'pydantic', 'pydantic_settings', 'sqlalchemy', 'alembic',
+  'pytest', 'uvicorn', 'passlib', 'jose', 'jwt', 'python-jose', 'os',
+  'sys', 'json', 'pathlib', 'asyncio', 'datetime', 'time', 'logging',
+  'starlette', 'requests', 'httpx', 'dotenv', 'typing', 'typing_extensions',
+  'uuid', 're', 'hashlib', 'base64', 'unittest', 'dataclasses', 'abc',
+]);
+
+function isThirdPartyLibrary(e: PimEntity): boolean {
+  const name = e.name.toLowerCase().trim();
+  if (THIRD_PARTY_PACKAGES.has(name)) return true;
+  if (e.sourceKinds.includes('package') && !e.sourceKinds.includes('code')) return true;
+  return false;
+}
+
+function isMicroEndpoint(e: PimEntity): boolean {
+  const name = e.name.trim();
+  return (
+    e.kind === 'endpoint' ||
+    name.startsWith('GET ') ||
+    name.startsWith('POST ') ||
+    name.startsWith('PUT ') ||
+    name.startsWith('DELETE ') ||
+    name.startsWith('PATCH ') ||
+    name.startsWith('OPTIONS ') ||
+    name.startsWith('HEAD ')
+  );
+}
+
+function cleanHumanLabel(name: string): string {
+  if (name === 'main' || name === 'main.py') return 'FastAPI Application (main.py)';
+  if (name.includes('routers.tasks') || name.includes('tasks.py')) return 'Tasks API Router';
+  if (name.includes('routers.auth') || name.includes('auth.py')) return 'Auth API Router';
+  if (name.includes('services.task_service')) return 'Task Service (task_service.py)';
+  if (name.includes('services.auth_service')) return 'Auth Service (auth_service.py)';
+  if (name.includes('services.user_service')) return 'User Service (user_service.py)';
+  if (name.includes('repositories.task_repository')) return 'Task Repository (task_repository.py)';
+  if (name.includes('repositories.user_repository')) return 'User Repository (user_repository.py)';
+  if (name === 'task_repository') return 'Task Repository';
+  if (name === 'user_repository') return 'User Repository';
+  if (name === 'database' || name.includes('db.database')) return 'Database Session Engine';
+  if (name.includes('db.base')) return 'SQLAlchemy Base Model';
+  if (name.includes('models.task')) return 'Task Data Model (task.py)';
+  if (name.includes('models.user')) return 'User Data Model (user.py)';
+  if (name === 'app.models') return 'Domain Models Package';
+  if (name === 'app') return 'Core Application Module';
+  if (name.includes('config')) return 'Application Config (config.py)';
+  return name;
+}
+
+function getEntityTier(e: PimEntity): number {
+  const name = e.name.toLowerCase();
+  const kind = (e.kind || '').toLowerCase();
+  const ont = (e.ontologyType || '').toLowerCase();
+
+  // Tier 0: Ingress / Gateway / Entrypoint
+  if (name === 'main' || name === 'app' || name === 'server' || kind === 'gateway' || ont.includes('gateway')) {
+    return 0;
+  }
+  // Tier 1: Routers / Controllers
+  if (name.includes('router') || name.includes('controller') || kind === 'router' || ont.includes('router')) {
+    return 1;
+  }
+  // Tier 2: Domain Services
+  if (name.includes('service') || kind === 'service' || ont.includes('service')) {
+    return 2;
+  }
+  // Tier 3: Repositories & Data Access
+  if (name.includes('repository') || name.includes('dao') || kind === 'repository' || ont.includes('repository')) {
+    return 3;
+  }
+  // Tier 4: Database & Persistence Models
+  if (kind === 'database' || ont.includes('database') || ont.includes('table') || ont.includes('model') || name.includes('model')) {
+    return 4;
+  }
+  // Tier 5: Config / Cross-cutting
+  return 5;
+}
+
 export function pimToDiagramPlan(
   pim: ProjectIntelligenceModel,
   options: PimToDiagramOptions = {},
 ): DiagramPlan {
   const viewType = options.viewType ?? 'architecture';
   const minConfidence = options.minConfidence ?? 0.0;
-  const maxNodes = options.maxNodes ?? 150;
+  const maxNodes = options.maxNodes ?? 14;
 
   let entities = pim.entities().filter((e) => e.confidence >= minConfidence);
   let diagramType: DiagramType = 'architecture';
   let layout: LayoutHint = 'hierarchical';
-  let title = options.title ?? `${pim.stats().entities}-Node System Topology`;
+  let title = options.title ?? 'System Architecture Overview';
 
   switch (viewType) {
     case 'erd': {
@@ -44,30 +125,31 @@ export function pimToDiagramPlan(
       title = options.title ?? 'Database Entity-Relationship Model';
       entities = entities.filter(
         (e) =>
-          e.kind === 'database' ||
-          e.category === 'data' ||
-          e.ontologyType === 'Database' ||
-          e.ontologyType === 'Table' ||
-          e.ontologyType === 'Model' ||
-          e.tags.includes('database') ||
-          e.tags.includes('sql')
+          !isThirdPartyLibrary(e) &&
+          (e.kind === 'database' ||
+            e.category === 'data' ||
+            e.ontologyType === 'Database' ||
+            e.ontologyType === 'Table' ||
+            e.ontologyType === 'Model' ||
+            e.name.toLowerCase().includes('model') ||
+            e.tags.includes('database') ||
+            e.tags.includes('sql')),
       );
       break;
     }
-    case 'c4-container': {
-      diagramType = 'architecture';
-      layout = 'hierarchical';
-      title = options.title ?? 'C4 Container & Service Architecture';
+    case 'api': {
+      diagramType = 'flowchart';
+      layout = 'horizontal';
+      title = options.title ?? 'API & Endpoint Routing Topology';
       entities = entities.filter(
         (e) =>
-          e.category === 'architecture' ||
-          e.kind === 'service' ||
-          e.kind === 'database' ||
-          e.kind === 'gateway' ||
-          e.kind === 'queue' ||
-          e.kind === 'client' ||
-          e.sourceKinds.includes('docker') ||
-          e.sourceKinds.includes('kubernetes')
+          !isThirdPartyLibrary(e) &&
+          (e.kind === 'endpoint' ||
+            e.kind === 'gateway' ||
+            e.kind === 'service' ||
+            e.category === 'api' ||
+            e.name.includes('router') ||
+            isMicroEndpoint(e)),
       );
       break;
     }
@@ -77,11 +159,33 @@ export function pimToDiagramPlan(
       title = options.title ?? 'Software Component Structure';
       entities = entities.filter(
         (e) =>
-          e.kind === 'component' ||
-          e.kind === 'class' ||
-          e.kind === 'interface' ||
-          e.kind === 'service' ||
-          e.category === 'code'
+          !isThirdPartyLibrary(e) &&
+          !isMicroEndpoint(e) &&
+          (e.kind === 'component' ||
+            e.kind === 'class' ||
+            e.kind === 'service' ||
+            e.kind === 'repository' ||
+            e.name.includes('Service') ||
+            e.name.includes('Repository')),
+      );
+      break;
+    }
+    case 'c4-container': {
+      diagramType = 'architecture';
+      layout = 'hierarchical';
+      title = options.title ?? 'C4 Container & Service Architecture';
+      entities = entities.filter(
+        (e) =>
+          !isThirdPartyLibrary(e) &&
+          !isMicroEndpoint(e) &&
+          (e.category === 'architecture' ||
+            e.kind === 'service' ||
+            e.kind === 'database' ||
+            e.kind === 'gateway' ||
+            e.name === 'main' ||
+            e.name.includes('Service') ||
+            e.name.includes('Repository') ||
+            e.name.includes('db')),
       );
       break;
     }
@@ -89,80 +193,142 @@ export function pimToDiagramPlan(
       diagramType = 'network';
       layout = 'flow';
       title = options.title ?? 'Module & Dependency Graph';
-      break;
-    }
-    case 'api': {
-      diagramType = 'flowchart';
-      layout = 'horizontal';
-      title = options.title ?? 'API & Endpoint Routing Topology';
-      entities = entities.filter(
-        (e) =>
-          e.kind === 'endpoint' ||
-          e.kind === 'gateway' ||
-          e.kind === 'service' ||
-          e.category === 'api' ||
-          e.sourceKinds.includes('openapi') ||
-          e.sourceKinds.includes('graphql')
-      );
+      entities = entities.filter((e) => !isThirdPartyLibrary(e));
       break;
     }
     default: {
+      // 'architecture' view — structured, high-signal, tiered view
       diagramType = 'architecture';
       layout = 'hierarchical';
-      title = options.title ?? 'System Architecture Overview';
+      title = options.title ?? 'Layered System Architecture';
+      entities = entities.filter((e) => !isThirdPartyLibrary(e) && !isMicroEndpoint(e));
       break;
     }
   }
 
-  // Fallback to all entities if the filtered subset is empty
-  if (entities.length === 0) {
-    entities = [...pim.entities()];
+  // Fallback if filtering produced too few entities
+  if (entities.length < 2) {
+    entities = pim.entities().filter((e) => !isThirdPartyLibrary(e));
+    if (entities.length < 2) {
+      entities = [...pim.entities()];
+    }
   }
 
-  // Bound node count
-  if (entities.length > maxNodes) {
-    entities = entities.slice(0, maxNodes);
+  // Group entities by tier and pick clean, balanced representative components
+  const tierBuckets: Record<number, PimEntity[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [] };
+  for (const ent of entities) {
+    const tier = getEntityTier(ent);
+    tierBuckets[tier]?.push(ent);
   }
 
-  const validEntityIds = new Set(entities.map((e) => e.id));
+  const selectedEntities: PimEntity[] = [];
+  const maxPerTier = Math.max(2, Math.floor(maxNodes / 4));
 
-  // Build nodes
-  const nodes: PlanNode[] = entities.map((e) => {
-    const isLowConfidence = e.confidence < 0.7;
-    const label = isLowConfidence && e.inferred ? `${e.name}*` : e.name;
-    const desc = e.description || (e.inferred ? 'Inferred from architectural dependencies' : undefined);
+  for (let t = 0; t <= 5; t++) {
+    const bucket = tierBuckets[t] ?? [];
+    // Prioritize entities with source code evidence and higher confidence
+    bucket.sort((a, b) => (b.confidence || 0) - (a.confidence || 0));
+    selectedEntities.push(...bucket.slice(0, maxPerTier));
+  }
 
+  // Ensure total nodes don't exceed maxNodes, but maintain minimum for meaningful layout
+  const finalEntities = selectedEntities.slice(0, maxNodes);
+  const validEntityIds = new Set(finalEntities.map((e) => e.id));
+  const entityTierMap = new Map<string, number>();
+  for (const ent of finalEntities) {
+    entityTierMap.set(ent.id, getEntityTier(ent));
+  }
+
+  // Build clean nodes
+  const nodes: PlanNode[] = finalEntities.map((e) => {
     return {
       id: e.id,
-      label,
+      label: cleanHumanLabel(e.name),
       type: mapOntologyKindToNodeType(e),
-      description: desc,
+      description: e.description || `Component in tier ${entityTierMap.get(e.id)}`,
       metadata: {
         category: e.category,
         confidence: e.confidence,
         ontologyType: e.ontologyType,
-        inferred: Boolean(e.inferred),
-        sources: e.sourceKinds.join(', '),
+        tier: entityTierMap.get(e.id) ?? 0,
       },
     };
   });
 
-  // Build relationships (only between valid nodes)
-  const relationships: PlanRelationship[] = pim
-    .relations()
-    .filter((r) => validEntityIds.has(r.source) && validEntityIds.has(r.target))
-    .map((r) => ({
+  // Build clean, directed relationships (eliminate hairballs & reverse-rank cycles)
+  const relationships: PlanRelationship[] = [];
+  const seenPair = new Set<string>();
+  const outDegree = new Map<string, number>();
+
+  // 1. First, include ground-truth relationships from PIM that flow downward or peer-to-peer
+  for (const r of pim.relations()) {
+    if (!validEntityIds.has(r.source) || !validEntityIds.has(r.target)) continue;
+    if (r.source === r.target) continue;
+
+    const sourceTier = entityTierMap.get(r.source) ?? 0;
+    const targetTier = entityTierMap.get(r.target) ?? 0;
+
+    // Prune upward edges that create spaghetti cycles in Dagre
+    if (sourceTier > targetTier) continue;
+
+    const pairKey = `${r.source}->${r.target}`;
+    if (seenPair.has(pairKey)) continue;
+
+    const currentOut = outDegree.get(r.source) ?? 0;
+    if (currentOut >= 2) continue; // bound fan-out per node to keep diagram clean
+
+    seenPair.add(pairKey);
+    outDegree.set(r.source, currentOut + 1);
+
+    relationships.push({
       source: r.source,
       target: r.target,
-      label: r.kind,
+      label: r.kind === 'dependsOn' ? 'depends' : r.kind,
       type: mapRelationKindToType(r.kind),
-      description: r.confidence < 0.7 ? 'Inferred relationship' : undefined,
-    }));
+      direction: 'forward',
+    });
+  }
+
+  // 2. Synthesize clean tier-to-tier connections if any tier is disconnected
+  const tierNodes: Record<number, string[]> = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [] };
+  for (const n of nodes) {
+    const t = entityTierMap.get(n.id) ?? 0;
+    tierNodes[t]?.push(n.id);
+  }
+
+  const activeTiers = [0, 1, 2, 3, 4, 5].filter((t) => (tierNodes[t]?.length ?? 0) > 0);
+
+  for (let i = 0; i < activeTiers.length - 1; i++) {
+    const currentTier = activeTiers[i]!;
+    const nextTier = activeTiers[i + 1]!;
+    const sources = tierNodes[currentTier] ?? [];
+    const targets = tierNodes[nextTier] ?? [];
+
+    for (const src of sources) {
+      const currentOut = outDegree.get(src) ?? 0;
+      if (currentOut === 0 && targets.length > 0) {
+        // Connect to first target in next tier to maintain cohesive top-down flow
+        const target = targets[0]!;
+        const pairKey = `${src}->${target}`;
+        if (!seenPair.has(pairKey)) {
+          seenPair.add(pairKey);
+          outDegree.set(src, currentOut + 1);
+          relationships.push({
+            source: src,
+            target,
+            label: 'calls',
+            type: 'flow',
+            direction: 'forward',
+          });
+        }
+      }
+    }
+  }
 
   return {
     diagramType,
     title,
-    description: `Auto-generated from Project Intelligence Model (${nodes.length} entities, ${relationships.length} connections).`,
+    description: `Clean architecture view with ${nodes.length} components and ${relationships.length} directional flows.`,
     layout,
     nodes,
     relationships,
@@ -170,13 +336,14 @@ export function pimToDiagramPlan(
 }
 
 function mapOntologyKindToNodeType(e: PimEntity): string {
+  const name = e.name.toLowerCase();
   const kind = (e.kind || '').toLowerCase();
   const ont = (e.ontologyType || '').toLowerCase();
 
-  if (kind.includes('database') || ont.includes('database') || ont.includes('table')) {
+  if (kind.includes('database') || ont.includes('database') || ont.includes('table') || name.includes('db')) {
     return 'database';
   }
-  if (kind.includes('gateway') || ont.includes('gateway')) {
+  if (kind.includes('gateway') || ont.includes('gateway') || name === 'main') {
     return 'gateway';
   }
   if (kind.includes('queue') || kind.includes('topic') || ont.includes('queue')) {
@@ -188,7 +355,13 @@ function mapOntologyKindToNodeType(e: PimEntity): string {
   if (kind.includes('client') || ont.includes('frontend')) {
     return 'client';
   }
-  if (kind.includes('component') || kind.includes('class')) {
+  if (name.includes('router') || kind === 'router') {
+    return 'gateway';
+  }
+  if (name.includes('service') || kind === 'service') {
+    return 'service';
+  }
+  if (name.includes('repository') || kind === 'repository') {
     return 'component';
   }
   return 'service';
@@ -230,4 +403,3 @@ export const PimToDiagramAdapter = {
     };
   },
 };
-

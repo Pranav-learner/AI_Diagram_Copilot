@@ -25,8 +25,8 @@ function runDagre(input: LayoutInput, defaults: DagreDefaults): LayoutResult {
     rankdir: input.direction ?? 'TB',
     nodesep: input.spacing?.node ?? defaults.nodesep,
     ranksep: input.spacing?.rank ?? defaults.ranksep,
-    marginx: 24,
-    marginy: 24,
+    marginx: 60,
+    marginy: 60,
   });
   g.setDefaultEdgeLabel(() => ({}));
 

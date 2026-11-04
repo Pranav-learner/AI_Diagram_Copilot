@@ -126,6 +126,7 @@ function ActiveTabController() {
 function PlanApplier() {
   const context = useContext(AIGenerationContext);
   const generator = context?.generator;
+  const runtime = context?.runtime;
   const isReady = useCanvasReady();
   const adapter = useCanvas();
 
@@ -136,6 +137,20 @@ function PlanApplier() {
       try {
         const plan = JSON.parse(pending);
         localStorage.removeItem('pending_generated_plan');
+        if (runtime) {
+          const doc = runtime.getDocument();
+          const existingNodeIds = Object.keys(doc.nodes);
+          if (existingNodeIds.length > 0) {
+            runtime.transaction(
+              () => {
+                for (const nid of existingNodeIds) {
+                  runtime.executeType('node.delete', { id: nid });
+                }
+              },
+              { label: 'Clear canvas for new architecture diagram', origin: 'program' }
+            );
+          }
+        }
         generator.applyPlan(plan);
         setTimeout(() => {
           try {
@@ -148,7 +163,7 @@ function PlanApplier() {
         console.error('Failed to apply pending diagram plan:', e);
       }
     }
-  }, [generator, isReady, adapter]);
+  }, [generator, isReady, adapter, runtime]);
 
   return null;
 }

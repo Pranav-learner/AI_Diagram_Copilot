@@ -54,15 +54,15 @@ export function shapeForRole(role: string | undefined): ShapeKind {
 }
 
 const CHAR_WIDTH = 8.5;
-const MIN_WIDTH = 130;
+const MIN_WIDTH = 160;
 const MAX_WIDTH = 280;
-const BASE_HEIGHT = 60;
+const BASE_HEIGHT = 65;
 
 export function sizeForNode(node: PlanNode, shape: ShapeKind): Size {
-  const width = clamp(Math.round(node.label.length * CHAR_WIDTH) + 44, MIN_WIDTH, MAX_WIDTH);
+  const width = clamp(Math.round(node.label.length * CHAR_WIDTH) + 48, MIN_WIDTH, MAX_WIDTH);
   // Diamonds/ellipses need extra height to fit centred text.
-  const height = shape === 'diamond' ? 90 : shape === 'ellipse' ? 70 : BASE_HEIGHT;
-  return { width: shape === 'diamond' ? Math.max(width, 140) : width, height };
+  const height = shape === 'diamond' ? 95 : shape === 'ellipse' ? 75 : BASE_HEIGHT;
+  return { width: shape === 'diamond' ? Math.max(width, 150) : width, height };
 }
 
 /** A palette of {fill, stroke} pairs that read well in light and dark themes. */

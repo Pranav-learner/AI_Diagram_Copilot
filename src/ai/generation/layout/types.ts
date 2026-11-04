@@ -62,4 +62,4 @@ export interface LayoutAlgorithm {
   compute(input: LayoutInput): LayoutResult;
 }
 
-export const DEFAULT_SPACING: LayoutSpacing = { node: 60, rank: 90 };
+export const DEFAULT_SPACING: LayoutSpacing = { node: 120, rank: 160 };
