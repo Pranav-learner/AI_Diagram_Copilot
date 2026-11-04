@@ -313,8 +313,15 @@ Instructions:
     try {
       const plan = pimToDiagramPlan(store.pim, { viewType: selectedViewType });
       if (generator) {
-        generator.applyPlan(plan);
+        localStorage.removeItem('pending_generated_plan');
         store.setActiveTab('canvas');
+        setTimeout(() => {
+          try {
+            generator.applyPlan(plan);
+          } catch (err: any) {
+            console.error('Failed to apply diagram plan:', err);
+          }
+        }, 50);
       } else {
         localStorage.setItem('pending_generated_plan', JSON.stringify(plan));
 

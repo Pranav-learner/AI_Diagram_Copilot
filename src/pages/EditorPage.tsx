@@ -12,6 +12,8 @@ import {
   CanvasProvider,
   CanvasStatusBar,
   DiagramRuntimeProvider,
+  useCanvas,
+  useCanvasReady,
 } from '@/features/canvas';
 import { AIGenerationProvider, AIGenerationContext, AiSidebar, SoftwareIntelligenceWorkspace, useProjectIntelligenceStore } from '@/features/ai';
 import { useUIStore } from '@/store';
@@ -96,24 +98,57 @@ function AutosaveController({
   return null;
 }
 
+/** Automatically fits content when switching back to canvas tab */
+function ActiveTabController() {
+  const activeTab = useProjectIntelligenceStore((s) => s.activeTab);
+  const adapter = useCanvas();
+
+  useEffect(() => {
+    if (activeTab !== 'canvas') {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      try {
+        adapter.fitToScreen();
+      } catch {
+        // ignore
+      }
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [activeTab, adapter]);
+
+  return null;
+}
+
 /** Ingests and renders any pending diagram plan generated from Software Intelligence */
 function PlanApplier() {
   const context = useContext(AIGenerationContext);
   const generator = context?.generator;
+  const isReady = useCanvasReady();
+  const adapter = useCanvas();
 
   useEffect(() => {
-    if (!generator) return;
+    if (!generator || !isReady) return;
     const pending = localStorage.getItem('pending_generated_plan');
     if (pending) {
       try {
         const plan = JSON.parse(pending);
         localStorage.removeItem('pending_generated_plan');
         generator.applyPlan(plan);
+        setTimeout(() => {
+          try {
+            adapter.fitToScreen();
+          } catch {
+            // ignore
+          }
+        }, 150);
       } catch (e) {
         console.error('Failed to apply pending diagram plan:', e);
       }
     }
-  }, [generator]);
+  }, [generator, isReady, adapter]);
 
   return null;
 }
@@ -133,6 +168,7 @@ function EditorWorkspace({
       <DiagramRuntimeProvider data={diagram.data}>
         <AIGenerationProvider>
           <PlanApplier />
+          <ActiveTabController />
           <EditorLayout
             project={project}
             isLoading={false}
@@ -144,7 +180,14 @@ function EditorWorkspace({
               projectId={project.id}
               initialVersion={diagram.version}
             />
-            {activeTab === 'canvas' ? <Canvas /> : <SoftwareIntelligenceWorkspace />}
+            <div className="relative h-full w-full">
+              <Canvas />
+            </div>
+            {activeTab === 'intelligence' && (
+              <div className="absolute inset-0 z-30 bg-background">
+                <SoftwareIntelligenceWorkspace />
+              </div>
+            )}
           </EditorLayout>
         </AIGenerationProvider>
       </DiagramRuntimeProvider>

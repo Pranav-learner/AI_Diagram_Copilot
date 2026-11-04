@@ -14,6 +14,7 @@ import type { PointerUpdatePayload } from '../adapters/ExcalidrawAdapter';
 import { CanvasErrorBoundary } from './CanvasErrorBoundary';
 import { CanvasToolbar } from './CanvasToolbar';
 import { CanvasSelectionActions } from './CanvasSelectionActions';
+import { useProjectIntelligenceStore } from '@/features/ai/store/useProjectIntelligenceStore';
 
 // Stable prop identities so Excalidraw never re-processes them on re-render.
 const UI_OPTIONS = {
@@ -67,6 +68,8 @@ export function Canvas() {
     [themePreference, prefersDark],
   );
 
+  const activeTab = useProjectIntelligenceStore((s) => s.activeTab);
+
   const handleAPI = useCallback(
     (api: ExcalidrawImperativeAPI) => {
       adapter.attach(api, containerRef.current);
@@ -99,8 +102,12 @@ export function Canvas() {
           initialData={initialDataRef.current}
           UIOptions={UI_OPTIONS}
         />
-        <CanvasToolbar />
-        <CanvasSelectionActions />
+        {activeTab === 'canvas' && (
+          <>
+            <CanvasToolbar />
+            <CanvasSelectionActions />
+          </>
+        )}
         <CanvasLoadingOverlay />
       </div>
     </CanvasErrorBoundary>

@@ -57,6 +57,9 @@ export class ExcalidrawAdapter implements CanvasEngine {
   private readonly sceneListeners = new Set<(scene: CanvasScene) => void>();
   private lastNotifyKey = '';
 
+  // Pending scene to apply as soon as Excalidraw attaches
+  private pendingScene: CanvasScene | null = null;
+
   // Best-effort history tracking (Excalidraw exposes no history availability).
   private historyNav = false;
 
@@ -85,7 +88,14 @@ export class ExcalidrawAdapter implements CanvasEngine {
       this.handleChange(elements, appState),
     );
     this.host.patch({ isReady: true, error: null });
-    this.handleChange(api.getSceneElements(), api.getAppState());
+
+    if (this.pendingScene) {
+      const pending = this.pendingScene;
+      this.pendingScene = null;
+      this.applyScene(pending);
+    } else {
+      this.handleChange(api.getSceneElements(), api.getAppState());
+    }
   }
 
   destroy(): void {
@@ -93,6 +103,7 @@ export class ExcalidrawAdapter implements CanvasEngine {
     this.unsubscribe = null;
     this.api = null;
     this.container = null;
+    this.pendingScene = null;
     this.lastVersion = -1;
     this.lastSelectionKey = '';
     this.historyNav = false;
@@ -218,12 +229,23 @@ export class ExcalidrawAdapter implements CanvasEngine {
    * version the synchronizer bumped actually repaint.
    */
   applyScene(scene: CanvasScene, options: { captureHistory?: boolean } = {}): void {
-    this.api?.updateScene({
+    if (!this.api) {
+      this.pendingScene = scene;
+      return;
+    }
+    this.api.updateScene({
       elements: scene.elements as unknown as Elements,
       captureUpdate: options.captureHistory
         ? CaptureUpdateAction.IMMEDIATELY
         : CaptureUpdateAction.NEVER,
     });
+    if (Array.isArray(scene.elements) && scene.elements.length > 0) {
+      try {
+        this.api.scrollToContent(undefined, { fitToViewport: true, animate: false });
+      } catch {
+        // Safe fallback
+      }
+    }
   }
 
   getSelectedIds(): readonly string[] {
