@@ -10,6 +10,7 @@
  */
 
 export { AIGenerationProvider } from './AIGenerationProvider';
+export { AIGenerationContext } from './AIGenerationContext';
 export { AiSidebar } from './components/AiSidebar';
 export { useAiCopilot } from './useAiCopilot';
 export type { UseAiCopilot } from './useAiCopilot';

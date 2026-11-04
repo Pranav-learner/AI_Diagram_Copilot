@@ -65,6 +65,7 @@ export class DiagramAgent extends BaseSpecialistAgent {
     } else if (files.length > 0) {
       for (let i = 0; i < Math.min(files.length, 8); i++) {
         const f = files[i];
+        if (!f) continue;
         const baseName = f.path.split('/').pop()?.replace(/\.[^/.]+$/, '') || `Node_${i + 1}`;
         elements.push({
           id: `el_${i + 1}`,

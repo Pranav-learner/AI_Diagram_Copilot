@@ -57,6 +57,7 @@ export class ReviewerAgent extends BaseSpecialistAgent {
       const lines = f.content.split('\n');
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        if (!line) continue;
         if (/console\.(log|debug)/.test(line)) {
           comments.push({
             file: f.path,

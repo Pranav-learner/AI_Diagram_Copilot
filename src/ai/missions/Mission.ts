@@ -121,5 +121,5 @@ export const MissionSchema = z.object({
   progress: z.number().min(0.0).max(1.0),
   objectives: z.array(ObjectiveSchema),
   artifacts: z.array(z.string()),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });

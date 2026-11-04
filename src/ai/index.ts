@@ -89,7 +89,7 @@ export * from './project-intelligence';
 // ── AI Execution Framework (Phase 6, Module 1) ───────────────────────────────
 export * from './execution/ExecutionFramework';
 export * from './execution/ExecutionContext';
-export * from './execution/ExecutionUnit';
+export type { ExecutionUnit, ExecutionUnitType, ExecutionResult as ExecutionUnitResult } from './execution/ExecutionUnit';
 export * from './execution/ExecutionLifecycle';
 export * from './execution/ExecutionManager';
 export * from './execution/ExecutionRegistry';
@@ -122,7 +122,18 @@ export * from './orchestrator/CheckpointManager';
 export * from './orchestrator/FailureManager';
 export * from './orchestrator/ApprovalManager';
 export * from './orchestrator/progress/ProgressTracker';
-export * from './orchestrator/events/OrchestratorEvents';
+export type {
+  OrchestratorEventType,
+  BaseOrchestratorEvent,
+  WorkflowStartedEvent,
+  NodeStartedEvent,
+  NodeCompletedEvent,
+  NodeFailedEvent,
+  NodeRetryEvent,
+  WorkflowCompletedEvent,
+  OrchestratorEvent,
+  ApprovalRequestedEvent as OrchestratorApprovalRequestedEvent,
+} from './orchestrator/events/OrchestratorEvents';
 export * from './orchestrator/policies/ExecutionPolicies';
 
 // ── Specialist Agents Framework (Phase 6, Module 3) ─────────────────────────
@@ -149,7 +160,7 @@ export * from './agents/specialists/ReviewerAgent';
 export * from './missions/Mission';
 export * from './missions/MissionContext';
 export * from './missions/MissionPlanner';
-export * from './missions/MissionValidator';
+export { MissionValidator, type ValidationResult as MissionValidationResult } from './missions/MissionValidator';
 export * from './missions/MissionDashboard';
 export * from './missions/MissionHistory';
 export * from './missions/coordination/MissionCoordinator';

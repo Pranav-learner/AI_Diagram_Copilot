@@ -4,7 +4,6 @@ import {
   ProjectIntelligenceEngine,
   ReverseEngineeringEngine,
   ProjectIntelligenceModel,
-  validatePim,
 } from '@/ai';
 
 export interface SessionMetrics {

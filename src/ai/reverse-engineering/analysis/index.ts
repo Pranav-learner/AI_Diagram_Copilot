@@ -9,7 +9,7 @@
  * platform" core the spec asks for.
  */
 
-import type { AstMetaValue, NormalizedAST } from '../ast/NormalizedAST';
+import type { NormalizedAST } from '../ast/NormalizedAST';
 import { astToUIR } from '../uir/UIR';
 import type { UIRDocument, UIREntity } from '../uir/UIR';
 import { CodeKnowledgeGraph } from '../graph/CodeKnowledgeGraph';

@@ -1,4 +1,3 @@
-import type { Mission } from '../Mission';
 import { MissionContext } from '../MissionContext';
 import { MissionPlanner } from '../MissionPlanner';
 import { MissionValidator } from '../MissionValidator';
@@ -97,7 +96,7 @@ export class MissionCoordinator {
 
       if (context.executionContext.cancellationToken.isCancelled) {
         mission.status = 'cancelled';
-        throw new Error(context.executionContext.cancellationToken.reason || 'Mission cancelled by user');
+        throw new Error(context.executionContext.cancellationToken.cancellationReason || 'Mission cancelled by user');
       }
 
       // 4. Update success criteria checks based on completed tasks

@@ -56,7 +56,7 @@ export class PerformanceAgent extends BaseSpecialistAgent {
       const lines = f.content.split('\n');
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        if (/readFileSync|writeFileSync|Thread\.sleep|time\.sleep/i.test(line)) {
+        if (line && /readFileSync|writeFileSync|Thread\.sleep|time\.sleep/i.test(line)) {
           bottlenecks.push({
             description: 'Synchronous blocking operation in execution path',
             location: `${f.path}:${i + 1}`,

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { AlertTriangle, RotateCcw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, RotateCcw, Database, Sparkles, ArrowRight } from 'lucide-react';
 import { useProjects } from '@/hooks';
 import { useProjectStore } from '@/store';
 import { getRecentProjects, queryProjects } from '@/utils';
@@ -52,6 +53,35 @@ export function DashboardPage() {
     <DashboardLayout>
       <div className="flex flex-col gap-6">
         <DashboardHeader totalCount={projects.length} isLoading={isLoading} />
+
+        {/* Software Intelligence Quick Entry Callout */}
+        <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-secondary/10 p-5 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-lg bg-primary/20 text-primary">
+                  <Database className="size-4" />
+                </span>
+                <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                  Phase 5 & 6 — Software Intelligence Engine
+                </span>
+              </div>
+              <h3 className="text-base font-semibold text-foreground">
+                Reverse-Engineer Repositories & Run Autonomous Missions
+              </h3>
+              <p className="max-w-2xl text-xs sm:text-sm text-muted-foreground">
+                Import local codebases (such as <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">small_start_python</code> or <code className="rounded bg-muted px-1 py-0.5 text-xs font-mono">LexiMind</code>), compile AST digital twins, auto-generate architecture diagrams, and dispatch 12 specialist AI agents.
+              </p>
+            </div>
+            <Button asChild className="shrink-0 gap-2 shadow-md">
+              <Link to="/intelligence">
+                <Sparkles className="size-4" />
+                Launch Software Intelligence
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
 
         {isError ? (
           <EmptyState

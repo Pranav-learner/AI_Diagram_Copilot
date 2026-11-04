@@ -81,7 +81,7 @@ export class BackendAgent extends BaseSpecialistAgent {
         const match = line.match(/(GET|POST|PUT|DELETE|PATCH)\s+["']([^"']+)["']/i) ||
                       line.match(/@(Get|Post|Put|Delete)Mapping\s*\(\s*["']([^"']+)["']\)/i) ||
                       line.match(/app\.(get|post|put|delete)\s*\(\s*["']([^"']+)["']/i);
-        if (match) {
+        if (match && match[1] && match[2]) {
           endpoints.push({
             method: match[1].toUpperCase(),
             path: match[2].startsWith('/') ? match[2] : `/${match[2]}`,

@@ -79,10 +79,10 @@ Please upload your project source files or load a pre-packaged sample repository
       } else {
         response += `#### Active Architectural Issues:\n\n`;
         conflicts.forEach((c, idx) => {
-          response += `##### ${idx + 1}. [${c.severity.toUpperCase()}] ${c.title}\n`;
+          response += `##### ${idx + 1}. [${c.severity.toUpperCase()}] ${c.kind}\n`;
           response += `* **Category:** \`${c.kind}\`\n`;
-          response += `* **Description:** ${c.description}\n`;
-          response += `* **Impacted Entities:** ${c.entityIds.map(id => `\`${pim.getEntity(id)?.name || id}\``).join(', ')}\n\n`;
+          response += `* **Description:** ${c.message}\n`;
+          response += `* **Impacted Entities:** ${c.entities.map((id: string) => `\`${pim.getEntity(id)?.name || id}\``).join(', ')}\n\n`;
         });
       }
       return response;

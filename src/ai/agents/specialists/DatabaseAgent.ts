@@ -58,10 +58,11 @@ export class DatabaseAgent extends BaseSpecialistAgent {
 
     const dbEntities = entities.filter((e) =>
       ['table', 'database', 'entity', 'model', 'schema'].includes(e.kind?.toLowerCase() || '') ||
+      /model|entity|table|schema|database|db/i.test(e.file || e.source?.file || e.name || '') ||
       /@Entity|Table/i.test(e.description || '')
     );
 
-    const sqlFiles = files.filter((f) => f.path.endsWith('.sql') || /schema|entity|model|migration/i.test(f.path));
+    const sqlFiles = files.filter((f) => f.path.endsWith('.sql') || /schema|entity|model|migration|db/i.test(f.path));
 
     if (dbEntities.length > 0 || sqlFiles.length > 0) {
       const tables = (dbEntities.length > 0 ? dbEntities : sqlFiles).slice(0, 5).map((item, idx) => {
@@ -74,7 +75,7 @@ export class DatabaseAgent extends BaseSpecialistAgent {
       });
 
       const relations: Array<{ fromTable: string; toTable: string; type: string }> = [];
-      if (tables.length > 1) {
+      if (tables.length > 1 && tables[0] && tables[1]) {
         relations.push({
           fromTable: tables[1].name,
           toTable: tables[0].name,

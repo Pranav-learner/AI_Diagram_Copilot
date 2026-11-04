@@ -1,4 +1,3 @@
-import type { Mission } from './Mission';
 
 export interface MissionHistoryRecord {
   readonly missionId: string;

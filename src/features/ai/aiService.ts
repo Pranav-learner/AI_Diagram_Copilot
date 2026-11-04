@@ -16,8 +16,6 @@ import {
   AIService,
   AIMetrics,
   ProviderRegistry,
-  AnthropicProvider,
-  OpenAIProvider,
   GeminiProvider,
   MockPlanProvider,
   MockEditProvider,

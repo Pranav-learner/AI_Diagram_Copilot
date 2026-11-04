@@ -1,4 +1,4 @@
-import type { Mission, Objective } from './Mission';
+import type { Mission } from './Mission';
 import type { SharedPlanningModel, SpmTask } from '../execution-graph/SharedPlanningModel';
 import type { ExecutionGraph } from '../execution-graph/ExecutionGraph';
 import { ExecutionCompiler } from '../execution-graph/ExecutionCompiler';

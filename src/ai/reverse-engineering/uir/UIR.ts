@@ -1,4 +1,4 @@
-import type { Language, NormalizedAST, SourceRef, ImportRef } from '../ast/NormalizedAST';
+import type { Language, NormalizedAST } from '../ast/NormalizedAST';
 
 export interface UIRReference {
   readonly file: string;

@@ -14,7 +14,7 @@ export class FailureManager {
 
   static async handleFailure(
     node: ExecutionNode,
-    error: Error,
+    _error: Error,
     rollbackHook?: () => Promise<void>
   ): Promise<'retry' | 'fallback' | 'skip' | 'abort'> {
     // Trigger rollback hook if supplied to undo partial edits

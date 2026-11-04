@@ -44,7 +44,7 @@ export class ResourceManager {
     });
   }
 
-  releaseSlot(node: ExecutionNode): void {
+  releaseSlot(_node: ExecutionNode): void {
     this.activeCount--;
     const next = this.queue.shift();
     if (next) {

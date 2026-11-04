@@ -103,6 +103,10 @@ Desktop.ini
 # 6. Temporary & Local Files
 # -----------------------------------------------------------------------------
 *.local
+*.db
+*.sqlite
+*.sqlite3
+test_repos/
 scratch/
 tmp/
 temp/

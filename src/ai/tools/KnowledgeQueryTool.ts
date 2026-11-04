@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Tool } from './Tool';
 import type { ExecutionContext } from '../execution/ExecutionContext';
-import type { ProjectIntelligenceModel, PimEntity } from '../project-intelligence/pim/ProjectIntelligenceModel';
+import type { ProjectIntelligenceModel } from '../project-intelligence/pim/ProjectIntelligenceModel';
 import type { ProjectIntelligenceEngine } from '../project-intelligence/ProjectIntelligenceEngine';
 
 export const KnowledgeQueryInputSchema = z.object({
@@ -38,10 +38,13 @@ export class KnowledgeQueryTool implements Tool {
 
     // 1. Single Entity Lookup
     if (entityId) {
-      const entity = typeof pim.entity === 'function'
-        ? pim.entity(entityId)
-        : Array.isArray((pim as any).entities)
-        ? (pim as any).entities.find((e: any) => e.id === entityId)
+      const pimAny = pim as any;
+      const entity = typeof pimAny.entity === 'function'
+        ? pimAny.entity(entityId)
+        : Array.isArray(pimAny.entities)
+        ? pimAny.entities.find((e: any) => e.id === entityId)
+        : typeof pim.entities === 'function'
+        ? pim.entities().find((e) => e.id === entityId)
         : undefined;
 
       if (!entity) {

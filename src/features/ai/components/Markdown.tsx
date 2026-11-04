@@ -1,11 +1,6 @@
 /**
- * A tiny, dependency-free markdown renderer.
- *
- * Explain Mode returns markdown prose; the repo has no markdown library and we
- * don't want to add one for a handful of constructs. This supports the subset the
- * explanations use — headings (`##`), bold, italic, inline `code`, and unordered
- * lists — and renders to React elements (so text is escaped by React, never
- * injected as HTML). Anything unrecognised falls through as a paragraph.
+ * Clean markdown renderer for AI responses and explanations.
+ * Renders headings, bold, italic, code spans, lists, blockquotes, and code blocks safely.
  */
 
 import { Fragment, type ReactNode } from 'react';
@@ -16,45 +11,95 @@ interface MarkdownProps {
 }
 
 export function Markdown({ content, className }: MarkdownProps) {
-  return <div className={className}>{renderBlocks(content)}</div>;
+  return <div className={`space-y-2 text-xs leading-relaxed ${className || ''}`}>{renderContent(content)}</div>;
 }
 
-/** Split into blank-line-separated blocks and render each. */
-function renderBlocks(text: string): ReactNode[] {
-  const blocks = text.replace(/\r\n/g, '\n').split(/\n{2,}/);
-  return blocks.map((block, i) => renderBlock(block.trim(), i)).filter(Boolean);
-}
+function renderContent(text: string): ReactNode[] {
+  if (!text) return [];
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const elements: ReactNode[] = [];
+  let currentList: string[] = [];
+  let key = 0;
 
-function renderBlock(block: string, key: number): ReactNode {
-  if (!block) return null;
+  const flushList = () => {
+    if (currentList.length > 0) {
+      elements.push(
+        <ul key={key++} className="my-1.5 list-disc space-y-1 pl-4 text-foreground/90">
+          {currentList.map((item, idx) => (
+            <li key={idx} className="leading-relaxed">
+              {renderInline(item)}
+            </li>
+          ))}
+        </ul>
+      );
+      currentList = [];
+    }
+  };
 
-  // Heading: ## Text
-  const heading = /^(#{1,6})\s+(.*)$/.exec(block);
-  if (heading) {
-    return (
-      <h4 key={key} className="mt-3 mb-1 text-sm font-semibold text-foreground">
-        {renderInline(heading[2]!)}
-      </h4>
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trim();
+    if (!line) {
+      flushList();
+      continue;
+    }
+
+    // Heading: #, ##, ###, ####
+    const headingMatch = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (headingMatch) {
+      flushList();
+      const level = headingMatch[1]!.length;
+      const text = headingMatch[2]!;
+      if (level <= 2) {
+        elements.push(
+          <h3 key={key++} className="mt-3.5 mb-1.5 text-sm font-bold text-foreground tracking-tight">
+            {renderInline(text)}
+          </h3>
+        );
+      } else if (level === 3) {
+        elements.push(
+          <h4 key={key++} className="mt-2.5 mb-1 text-xs font-bold text-primary tracking-wide uppercase">
+            {renderInline(text)}
+          </h4>
+        );
+      } else {
+        elements.push(
+          <h5 key={key++} className="mt-2 mb-1 text-xs font-semibold text-foreground">
+            {renderInline(text)}
+          </h5>
+        );
+      }
+      continue;
+    }
+
+    // Blockquote: > text
+    if (line.startsWith('>')) {
+      flushList();
+      const quoteText = line.replace(/^>\s*/, '');
+      elements.push(
+        <blockquote key={key++} className="border-l-2 border-primary/50 pl-3 py-0.5 my-1.5 italic text-muted-foreground bg-muted/20 rounded-r">
+          {renderInline(quoteText)}
+        </blockquote>
+      );
+      continue;
+    }
+
+    // Unordered list item: - or *
+    if (/^[-*]\s+/.test(line)) {
+      currentList.push(line.replace(/^[-*]\s+/, ''));
+      continue;
+    }
+
+    // Standard paragraph line
+    flushList();
+    elements.push(
+      <p key={key++} className="my-1 text-foreground/90 leading-relaxed">
+        {renderInline(line)}
+      </p>
     );
   }
 
-  // Unordered list: every line starts with - or *
-  const lines = block.split('\n');
-  if (lines.every((l) => /^\s*[-*]\s+/.test(l))) {
-    return (
-      <ul key={key} className="my-1 list-disc space-y-0.5 pl-4">
-        {lines.map((l, i) => (
-          <li key={i}>{renderInline(l.replace(/^\s*[-*]\s+/, ''))}</li>
-        ))}
-      </ul>
-    );
-  }
-
-  return (
-    <p key={key} className="my-1 leading-relaxed">
-      {renderInline(block)}
-    </p>
-  );
+  flushList();
+  return elements;
 }
 
 /** Parse inline **bold**, *italic*, and `code`. */
@@ -66,9 +111,9 @@ function renderInline(text: string): ReactNode[] {
   let key = 0;
   while ((match = regex.exec(text)) !== null) {
     if (match.index > lastIndex) tokens.push(<Fragment key={key++}>{text.slice(lastIndex, match.index)}</Fragment>);
-    if (match[2] !== undefined) tokens.push(<strong key={key++} className="font-semibold">{match[2]}</strong>);
+    if (match[2] !== undefined) tokens.push(<strong key={key++} className="font-semibold text-foreground">{match[2]}</strong>);
     else if (match[3] !== undefined) tokens.push(<em key={key++}>{match[3]}</em>);
-    else if (match[4] !== undefined) tokens.push(<code key={key++} className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]">{match[4]}</code>);
+    else if (match[4] !== undefined) tokens.push(<code key={key++} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-primary">{match[4]}</code>);
     lastIndex = regex.lastIndex;
   }
   if (lastIndex < text.length) tokens.push(<Fragment key={key++}>{text.slice(lastIndex)}</Fragment>);

@@ -10,6 +10,9 @@ const DashboardPage = lazy(() =>
 const EditorPage = lazy(() =>
   import('@/pages/EditorPage').then((m) => ({ default: m.EditorPage })),
 );
+const IntelligencePage = lazy(() =>
+  import('@/pages/IntelligencePage').then((m) => ({ default: m.IntelligencePage })),
+);
 const SettingsPage = lazy(() =>
   import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
 );
@@ -27,6 +30,10 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: withSuspense(<DashboardPage />),
+  },
+  {
+    path: '/intelligence',
+    element: withSuspense(<IntelligencePage />),
   },
   {
     path: '/editor/:projectId',

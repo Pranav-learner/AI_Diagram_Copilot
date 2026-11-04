@@ -26,7 +26,7 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
     return this.manifest.version;
   }
 
-  async initialize?(context: ExecutionContext): Promise<void> {
+  async initialize?(_context: ExecutionContext): Promise<void> {
     // Optional initialization hook
   }
 
@@ -107,7 +107,7 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
         executionMetadata: {
           latencyMs: Date.now() - startTime,
           tokenUsage: rawResult.tokenUsage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-          modelUsed: rawResult.modelUsed || this.manifest.supportedModels[0] || 'gemini-1.5-pro',
+          modelUsed: rawResult.modelUsed || this.manifest.supportedModels[0] || 'gemini-2.5-flash',
           cost: rawResult.cost ?? 0.0,
           retries,
         },
@@ -131,7 +131,7 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
     }
   }
 
-  async cleanup?(context: ExecutionContext): Promise<void> {
+  async cleanup?(_context: ExecutionContext): Promise<void> {
     // Optional cleanup hook
   }
 
@@ -147,7 +147,7 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
       return framework.executeTool(toolId, args, context);
     }
     const registry = context.metadata.toolRegistry;
-    if (registry && typeof registry.executeTool === 'function') {
+    if (registry && typeof registry.executeTool === 'function' && (typeof registry.has !== 'function' || registry.has(toolId))) {
       return registry.executeTool(toolId, args, context);
     }
     if (toolId === 'knowledge:query') {
@@ -186,8 +186,14 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
    * Helper to retrieve code entities from PIM or RE engine.
    */
   protected getEntities(context: ExecutionContext): any[] {
-    if (context.metadata.pim?.entities && Array.isArray(context.metadata.pim.entities)) {
-      return context.metadata.pim.entities;
+    const pim = context.metadata.pim;
+    if (pim) {
+      if (typeof pim.entities === 'function') {
+        return pim.entities();
+      }
+      if (Array.isArray(pim.entities)) {
+        return pim.entities;
+      }
     }
     const reEngine = context.metadata.reEngine;
     if (reEngine && typeof reEngine.entities === 'function') {
@@ -202,23 +208,26 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
   private slicePim(fullPim?: any): Record<string, any> | undefined {
     if (!fullPim) return undefined;
     // Decouple by extracting only entities relevant to agent capabilities
+    const allEntities = typeof fullPim.entities === 'function'
+      ? fullPim.entities()
+      : Array.isArray(fullPim.entities)
+      ? fullPim.entities
+      : [];
     const sliced: Record<string, any> = { entities: [] };
-    if (Array.isArray(fullPim.entities)) {
-      sliced.entities = fullPim.entities.filter((entity: any) => {
-        // e.g. DiagramAgent only gets visual or diagram entities, DatabaseAgent gets tables, etc.
-        if (this.id === 'database-agent') {
-          return entity.kind === 'database' || entity.kind === 'table' || entity.kind === 'schema';
-        }
-        if (this.id === 'diagram-agent') {
-          return entity.kind === 'diagram' || entity.kind === 'component';
-        }
-        if (this.id === 'security-agent') {
-          return entity.kind === 'service' || entity.kind === 'deployment' || entity.kind === 'api';
-        }
-        // Fallback: default limit
-        return true;
-      });
-    }
+    sliced.entities = allEntities.filter((entity: any) => {
+      // e.g. DiagramAgent only gets visual or diagram entities, DatabaseAgent gets tables, etc.
+      if (this.id === 'database-agent') {
+        return entity.kind === 'database' || entity.kind === 'table' || entity.kind === 'schema' || entity.ontologyType === 'SoftwareComponent';
+      }
+      if (this.id === 'diagram-agent') {
+        return entity.kind === 'diagram' || entity.kind === 'component' || entity.ontologyType === 'SoftwareComponent';
+      }
+      if (this.id === 'security-agent') {
+        return entity.kind === 'service' || entity.kind === 'deployment' || entity.kind === 'api' || entity.ontologyType === 'API';
+      }
+      // Fallback: default limit
+      return true;
+    });
     return sliced;
   }
 

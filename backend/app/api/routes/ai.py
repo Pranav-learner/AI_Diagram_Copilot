@@ -5,6 +5,7 @@ to the browser client or repository code.
 """
 
 import os
+import urllib.parse
 from typing import Any
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response, status
@@ -46,7 +47,9 @@ async def proxy_gemini(path: str, request: Request) -> Response:
     params = dict(request.query_params)
     params["key"] = key
 
-    target_url = f"{GOOGLE_API_BASE}/{path}"
+    # Unquote path to handle encoded colons like %3A in :generateContent
+    clean_path = urllib.parse.unquote(path)
+    target_url = f"{GOOGLE_API_BASE}/{clean_path}"
     body = await request.body()
     headers = {"content-type": request.headers.get("content-type", "application/json")}
 

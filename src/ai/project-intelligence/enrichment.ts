@@ -28,7 +28,7 @@ export function enrich(entities: readonly PimEntity[], relations: readonly PimRe
 
   const ensure = (id: string, name: string, kind: PimEntityKind, source: string): void => {
     if (!all.has(id)) {
-      all.set(id, { id, name, kind, category: 'architecture', aliases: [], tags: [kind], confidence: 0.6, evidence: [inferenceEvidence(source)], sourceKinds: ['inference'], attributes: { inferred: true }, inferred: true, pkmIds: [] });
+      all.set(id, { id, name, kind, ontologyType: kind === 'service' ? 'Service' : kind === 'database' ? 'Database' : 'Component', category: 'architecture', aliases: [], tags: [kind], confidence: 0.6, evidence: [inferenceEvidence(source)], sourceKinds: ['inference'], attributes: { inferred: true }, inferred: true, pkmIds: [] });
     }
   };
   const link = (source: string, kind: PimRelationKind, target: string, evidence: Evidence): void => {

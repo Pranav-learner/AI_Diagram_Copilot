@@ -72,9 +72,9 @@ export interface AIConfig {
 export const defaultAIConfig: AIConfig = Object.freeze({
   provider: 'gemini',
   models: Object.freeze({
-    default: { model: 'gemini-1.5-pro', temperature: 0.2, maxTokens: 4096 },
-    fast: { model: 'gemini-1.5-flash', temperature: 0, maxTokens: 1024 },
-    reasoning: { model: 'gemini-1.5-pro', temperature: 0.1, maxTokens: 8192 },
+    default: { model: 'gemini-2.5-flash', temperature: 0.2, maxTokens: 4096 },
+    fast: { model: 'gemini-2.5-flash', temperature: 0, maxTokens: 1024 },
+    reasoning: { model: 'gemini-2.5-flash', temperature: 0.1, maxTokens: 8192 },
   }),
   retry: Object.freeze({
     maxRetries: 2,

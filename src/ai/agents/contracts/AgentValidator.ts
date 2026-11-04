@@ -1,6 +1,5 @@
 import type { AgentManifest } from './AgentManifest';
 import type { AgentContext } from './AgentContract';
-import type { AgentOutput } from './AgentContract';
 
 export class AgentValidator {
   /**

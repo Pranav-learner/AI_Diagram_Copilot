@@ -67,11 +67,12 @@ export class RepositoryAgent extends BaseSpecialistAgent {
           matchedFiles.push(f.path);
           const lines = f.content.split('\n');
           for (let i = 0; i < lines.length; i++) {
-            if (lines[i].toLowerCase().includes(query.toLowerCase())) {
+            const line = lines[i];
+            if (line && line.toLowerCase().includes(query.toLowerCase())) {
               matchedCodeSnippets.push({
                 file: f.path,
                 line: i + 1,
-                snippet: lines[i].trim(),
+                snippet: line.trim(),
               });
               break;
             }

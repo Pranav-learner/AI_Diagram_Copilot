@@ -1,7 +1,9 @@
+import { useContext, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { AlertTriangle, FileQuestion, Loader2, RotateCcw } from 'lucide-react';
 import { useAutosave, useDiagram, useProject } from '@/hooks';
 import type { DiagramResponse, Project } from '@/types';
+import { projectService } from '@/services';
 import { EditorLayout } from '@/components/layout';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,7 +13,7 @@ import {
   CanvasStatusBar,
   DiagramRuntimeProvider,
 } from '@/features/canvas';
-import { AIGenerationProvider, AiSidebar, SoftwareIntelligenceWorkspace, useProjectIntelligenceStore } from '@/features/ai';
+import { AIGenerationProvider, AIGenerationContext, AiSidebar, SoftwareIntelligenceWorkspace, useProjectIntelligenceStore } from '@/features/ai';
 import { useUIStore } from '@/store';
 
 /** Dotted-canvas skeleton shown while project + diagram load. */
@@ -36,14 +38,18 @@ function CanvasError({ onRetry }: { onRetry: () => void }) {
       <div className="space-y-1">
         <h2 className="text-base font-semibold">Couldn't load this diagram</h2>
         <p className="max-w-sm text-sm text-muted-foreground">
-          There was a problem reaching the server. Check your connection and try
-          again.
+          There was a problem reaching the server or this diagram ID is invalid.
         </p>
       </div>
-      <Button onClick={onRetry} variant="outline">
-        <RotateCcw />
-        Retry
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button onClick={onRetry} variant="outline">
+          <RotateCcw />
+          Retry
+        </Button>
+        <Button asChild>
+          <Link to="/">Back to Dashboard</Link>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -90,6 +96,28 @@ function AutosaveController({
   return null;
 }
 
+/** Ingests and renders any pending diagram plan generated from Software Intelligence */
+function PlanApplier() {
+  const context = useContext(AIGenerationContext);
+  const generator = context?.generator;
+
+  useEffect(() => {
+    if (!generator) return;
+    const pending = localStorage.getItem('pending_generated_plan');
+    if (pending) {
+      try {
+        const plan = JSON.parse(pending);
+        localStorage.removeItem('pending_generated_plan');
+        generator.applyPlan(plan);
+      } catch (e) {
+        console.error('Failed to apply pending diagram plan:', e);
+      }
+    }
+  }, [generator]);
+
+  return null;
+}
+
 /** The loaded editor: engine provider + canvas + panels + autosave. */
 function EditorWorkspace({
   project,
@@ -104,6 +132,7 @@ function EditorWorkspace({
     <CanvasProvider>
       <DiagramRuntimeProvider data={diagram.data}>
         <AIGenerationProvider>
+          <PlanApplier />
           <EditorLayout
             project={project}
             isLoading={false}
@@ -133,6 +162,24 @@ export function EditorPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const projectQuery = useProject(projectId);
   const diagramQuery = useDiagram(projectId);
+
+  // Self-heal legacy non-UUID slugs (such as 'microservices-architecture')
+  useEffect(() => {
+    const isUUID =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId || '') ||
+      /^[0-9a-f]{32}$/i.test(projectId || '');
+
+    if (projectId && !isUUID) {
+      projectService
+        .list()
+        .then((projects) => {
+          if (projects.length > 0) {
+            window.location.replace(`/editor/${projects[0]!.id}`);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [projectId]);
 
   // Project resolved but absent → not found.
   if (projectQuery.data === null && !projectQuery.isLoading) {

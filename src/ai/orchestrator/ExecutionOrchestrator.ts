@@ -52,7 +52,12 @@ export class ExecutionOrchestrator {
     
     if (this.pendingCheckpointState) {
       this.scheduler = new Scheduler(graph);
-      this.resourceManager = new ResourceManager(this.options.policies);
+      this.resourceManager = new ResourceManager({
+        concurrencyLimit: this.options.policies?.globalConcurrencyLimit,
+        tokenLimit: this.options.policies?.globalTokenLimit,
+        costLimit: this.options.policies?.globalCostLimit,
+        timeoutMs: this.options.policies?.globalTimeoutMs,
+      });
       this.progressTracker = new ProgressTracker(graph);
 
       for (const [nodeId, status] of Object.entries(this.pendingCheckpointState.nodeStatuses)) {
@@ -69,7 +74,12 @@ export class ExecutionOrchestrator {
       this.pendingCheckpointState = undefined;
     } else if (!this.scheduler) {
       this.scheduler = new Scheduler(graph);
-      this.resourceManager = new ResourceManager(this.options.policies);
+      this.resourceManager = new ResourceManager({
+        concurrencyLimit: this.options.policies?.globalConcurrencyLimit,
+        tokenLimit: this.options.policies?.globalTokenLimit,
+        costLimit: this.options.policies?.globalCostLimit,
+        timeoutMs: this.options.policies?.globalTimeoutMs,
+      });
       this.progressTracker = new ProgressTracker(graph);
     }
 
@@ -418,7 +428,7 @@ export class ExecutionOrchestrator {
 
   private async publishEvent(event: OrchestratorEvent): Promise<void> {
     if (this.options.eventBus) {
-      this.options.eventBus.publish(event);
+      this.options.eventBus.publish(event as any);
     }
   }
 }

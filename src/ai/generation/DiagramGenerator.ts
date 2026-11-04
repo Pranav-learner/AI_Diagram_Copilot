@@ -263,7 +263,7 @@ export class DiagramGenerator {
       const validation = validatePlan(plan, { typeRegistry: this.typeRegistry });
       if (!validation.ok) {
         const msg = validation.errors.map((e) => e.message).join('; ');
-        throw new GenerationError('validating', `Invalid diagram plan: ${msg}`);
+        throw new GenerationError(`Invalid diagram plan: ${msg}`, 'validating');
       }
       const validationMs = this.now() - valStart;
       stage('validating', 'done');

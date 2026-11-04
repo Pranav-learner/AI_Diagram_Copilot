@@ -35,21 +35,22 @@ export class RepositorySearchTool implements Tool {
     }> = [];
 
     // 1. Search via ReverseEngineeringEngine AST Graph if present
-    if (reEngine) {
+    if (reEngine && typeof reEngine.search === 'function') {
       const graphHits = reEngine.search({
-        query,
+        text: query,
         limit,
-        kinds: type === 'class' ? ['class', 'interface'] : undefined,
+        kind: type === 'class' ? 'class' : undefined,
       });
 
       for (const hit of graphHits) {
-        if (pathPattern && !hit.entity.source.file.includes(pathPattern)) continue;
+        const filePath = hit.file || '';
+        if (pathPattern && !filePath.includes(pathPattern)) continue;
         matches.push({
-          path: hit.entity.source.file,
-          symbol: hit.entity.name,
-          kind: hit.entity.kind,
-          line: hit.entity.source.startLine,
-          snippet: hit.entity.doc || `Declared ${hit.entity.kind} ${hit.entity.name}`,
+          path: filePath,
+          symbol: hit.name,
+          kind: hit.kind,
+          line: 1,
+          snippet: hit.qualifiedName || `Declared ${hit.kind} ${hit.name}`,
           provenance: 'AST Parse',
         });
       }

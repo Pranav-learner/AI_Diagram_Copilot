@@ -5,7 +5,7 @@
  * into a semantic DiagramPlan for Dagre layout and canvas execution.
  */
 
-import type { ProjectIntelligenceModel, PimEntity, PimRelation } from '../../project-intelligence/pim/ProjectIntelligenceModel';
+import type { ProjectIntelligenceModel, PimEntity } from '../../project-intelligence/pim/ProjectIntelligenceModel';
 import type { DiagramPlan, PlanNode, PlanRelationship } from './DiagramPlan';
 import type { DiagramType, LayoutHint } from './DiagramType';
 
@@ -116,7 +116,7 @@ export function pimToDiagramPlan(
 
   // Fallback to all entities if the filtered subset is empty
   if (entities.length === 0) {
-    entities = pim.entities();
+    entities = [...pim.entities()];
   }
 
   // Bound node count
@@ -219,4 +219,15 @@ function mapRelationKindToType(kind: string): PlanRelationship['type'] {
       return 'flow';
   }
 }
+
+export const PimToDiagramAdapter = {
+  generate(pim: ProjectIntelligenceModel, viewType: ArchitectureViewType = 'architecture') {
+    const plan = pimToDiagramPlan(pim, { viewType });
+    return {
+      plan,
+      elementCount: plan.nodes.length,
+      relationshipCount: plan.relationships.length,
+    };
+  },
+};
 

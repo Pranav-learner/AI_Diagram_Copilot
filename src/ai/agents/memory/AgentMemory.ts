@@ -245,7 +245,7 @@ export class AgentMemory {
       this.missionEntries.delete(missionId);
       this.missionHandoffs.delete(missionId);
     } else {
-      this.missionEntries.clear(this.missionHandoffs.clear() as any);
+      this.missionEntries.clear();
       this.missionHandoffs.clear();
     }
   }

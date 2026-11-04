@@ -15,10 +15,8 @@ class Settings(BaseSettings):
     app_name: str = "AI Diagram Copilot API"
     environment: str = "development"
 
-    # SQLAlchemy URL. Defaults to the local dev Postgres cluster; override in .env.
-    database_url: str = (
-        "postgresql+psycopg://postgres@localhost:5432/diagram_copilot"
-    )
+    # SQLAlchemy URL. Defaults to local SQLite for zero-setup local dev; override with PostgreSQL in .env.
+    database_url: str = "sqlite:///./diagram_copilot.db"
 
     cors_origins: list[str] = [
         "http://localhost:5173",

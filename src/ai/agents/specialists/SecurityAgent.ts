@@ -56,6 +56,7 @@ export class SecurityAgent extends BaseSpecialistAgent {
       const lines = f.content.split('\n');
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        if (!line) continue;
         if (/(password|secret|token|api_key)\s*[:=]\s*["'][^"']{6,}["']/i.test(line) && !/example|placeholder|dummy|test/i.test(line)) {
           vulnerabilities.push({
             severity: 'high',

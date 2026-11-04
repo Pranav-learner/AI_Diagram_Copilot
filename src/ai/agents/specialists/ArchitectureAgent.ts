@@ -47,7 +47,7 @@ export class ArchitectureAgent extends BaseSpecialistAgent {
     }
 
     // 2. Invoke tool to query knowledge
-    const queryResult = await this.invokeTool('knowledge:query', { query: 'Fetch layers and service entities' }, context.executionContext);
+    await this.invokeTool('knowledge:query', { query: 'Fetch layers and service entities' }, context.executionContext);
 
     const entities = this.getEntities(context.executionContext);
     const files = this.getRepoFiles(context.executionContext);
