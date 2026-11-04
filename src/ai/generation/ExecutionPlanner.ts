@@ -91,7 +91,12 @@ export class ExecutionPlanner {
         shape,
         size: sizeForNode(node, shape),
         role: node.type,
-        style: styleForNode({ colorIndex: colorIndexForKey(colorKey), emphasized }),
+        style: styleForNode({
+          colorIndex: colorIndexForKey(colorKey),
+          emphasized,
+          role: node.type,
+          tier: node.metadata?.tier as number | undefined,
+        }),
       });
     });
 
@@ -119,7 +124,10 @@ export class ExecutionPlanner {
         type: 'shape',
         shape: visual.shape,
         semantic: node.type,
-        label: { text: node.label },
+        label: {
+          text: node.label,
+          style: visual.style,
+        },
         position: positionOf(node.id),
         size: visual.size,
         style: visual.style,
@@ -147,9 +155,14 @@ export class ExecutionPlanner {
       const spec: Record<string, unknown> = {
         routing,
         arrowheads: arrowheadsForDirection(rel.direction),
+        style: {
+          stroke: { color: '#64748b', width: 2 },
+        },
+        metadata: {
+          roughness: 0,
+          ...(rel.type ? { relType: rel.type } : {}),
+        },
       };
-      if (rel.label) spec.label = { text: rel.label };
-      if (rel.type) spec.metadata = { relType: rel.type };
       operations.push(descriptor('edge.connect', { id: this.ids.edge(), source, target, spec }, 'Connect'));
     }
 
@@ -204,7 +217,7 @@ function descriptor(type: string, params: Record<string, unknown>, label?: strin
 }
 
 function nodeMetadata(node: PlanNode): Metadata {
-  const meta: Record<string, MetadataValue> = { aiGenerated: true };
+  const meta: Record<string, MetadataValue> = { aiGenerated: true, roughness: 0 };
   if (node.type) meta.role = node.type;
   if (node.description) meta.description = node.description;
   if (node.metadata) Object.assign(meta, node.metadata);

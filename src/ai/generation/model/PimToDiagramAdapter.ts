@@ -55,25 +55,39 @@ function isMicroEndpoint(e: PimEntity): boolean {
   );
 }
 
+function isStructuralFolderWrapper(e: PimEntity): boolean {
+  const name = e.name.toLowerCase().trim();
+  return (
+    name === 'app' ||
+    name === 'src' ||
+    name === 'root' ||
+    name === 'app.models' ||
+    name === 'models' ||
+    name === 'schemas' ||
+    name === 'app.schemas' ||
+    name === 'app.handlers' ||
+    name === 'handlers' ||
+    name === 'exceptions' ||
+    name === 'app.exceptions'
+  );
+}
+
 function cleanHumanLabel(name: string): string {
-  if (name === 'main' || name === 'main.py') return 'FastAPI Application (main.py)';
-  if (name.includes('routers.tasks') || name.includes('tasks.py')) return 'Tasks API Router';
-  if (name.includes('routers.auth') || name.includes('auth.py')) return 'Auth API Router';
-  if (name.includes('services.task_service')) return 'Task Service (task_service.py)';
-  if (name.includes('services.auth_service')) return 'Auth Service (auth_service.py)';
-  if (name.includes('services.user_service')) return 'User Service (user_service.py)';
-  if (name.includes('repositories.task_repository')) return 'Task Repository (task_repository.py)';
-  if (name.includes('repositories.user_repository')) return 'User Repository (user_repository.py)';
-  if (name === 'task_repository') return 'Task Repository';
-  if (name === 'user_repository') return 'User Repository';
-  if (name === 'database' || name.includes('db.database')) return 'Database Session Engine';
-  if (name.includes('db.base')) return 'SQLAlchemy Base Model';
-  if (name.includes('models.task')) return 'Task Data Model (task.py)';
-  if (name.includes('models.user')) return 'User Data Model (user.py)';
-  if (name === 'app.models') return 'Domain Models Package';
-  if (name === 'app') return 'Core Application Module';
-  if (name.includes('config')) return 'Application Config (config.py)';
-  return name;
+  const n = name.trim();
+  if (n === 'main' || n === 'main.py') return 'FastAPI Application (main.py)';
+  if (n.includes('routers.tasks') || n.includes('tasks.py')) return 'Tasks Router (tasks.py)';
+  if (n.includes('routers.auth') || n.includes('auth.py')) return 'Auth Router (auth.py)';
+  if (n.includes('services.task_service') || n === 'TaskService' || n === 'task_service') return 'Task Service';
+  if (n.includes('services.auth_service') || n === 'AuthService' || n === 'auth_service') return 'Auth Service';
+  if (n.includes('services.user_service') || n === 'UserService' || n === 'user_service') return 'User Service';
+  if (n.includes('repositories.task_repository') || n === 'TaskRepository' || n === 'task_repository') return 'Task Repository';
+  if (n.includes('repositories.user_repository') || n === 'UserRepository' || n === 'user_repository') return 'User Repository';
+  if (n === 'database' || n.includes('db.database')) return 'Database Session Engine';
+  if (n.includes('db.base') || n === 'Base') return 'SQLAlchemy Base Model';
+  if (n.includes('models.task') || n === 'Task' || n === 'TaskModel') return 'Task Data Model';
+  if (n.includes('models.user') || n === 'User' || n === 'UserModel') return 'User Data Model';
+  if (n.includes('config')) return 'Application Config (config.py)';
+  return n;
 }
 
 function getEntityTier(e: PimEntity): number {
@@ -82,7 +96,7 @@ function getEntityTier(e: PimEntity): number {
   const ont = (e.ontologyType || '').toLowerCase();
 
   // Tier 0: Ingress / Gateway / Entrypoint
-  if (name === 'main' || name === 'app' || name === 'server' || kind === 'gateway' || ont.includes('gateway')) {
+  if (name === 'main' || name.includes('main.py') || kind === 'gateway' || ont.includes('gateway')) {
     return 0;
   }
   // Tier 1: Routers / Controllers
@@ -98,7 +112,7 @@ function getEntityTier(e: PimEntity): number {
     return 3;
   }
   // Tier 4: Database & Persistence Models
-  if (kind === 'database' || ont.includes('database') || ont.includes('table') || ont.includes('model') || name.includes('model')) {
+  if (kind === 'database' || ont.includes('database') || ont.includes('table') || ont.includes('model') || name.includes('model') || name.includes('db.')) {
     return 4;
   }
   // Tier 5: Config / Cross-cutting
@@ -201,14 +215,28 @@ export function pimToDiagramPlan(
       diagramType = 'architecture';
       layout = 'hierarchical';
       title = options.title ?? 'Layered System Architecture';
-      entities = entities.filter((e) => !isThirdPartyLibrary(e) && !isMicroEndpoint(e));
+      entities = entities.filter(
+        (e) => !isThirdPartyLibrary(e) && !isMicroEndpoint(e) && !isStructuralFolderWrapper(e),
+      );
       break;
     }
   }
 
+  // Deduplicate entities that map to the same human label (e.g. module vs class with same name)
+  const labelToEntity = new Map<string, PimEntity>();
+  for (const ent of entities) {
+    if (isStructuralFolderWrapper(ent)) continue;
+    const label = cleanHumanLabel(ent.name);
+    const existing = labelToEntity.get(label);
+    if (!existing || (ent.confidence || 0) > (existing.confidence || 0)) {
+      labelToEntity.set(label, ent);
+    }
+  }
+  entities = Array.from(labelToEntity.values());
+
   // Fallback if filtering produced too few entities
   if (entities.length < 2) {
-    entities = pim.entities().filter((e) => !isThirdPartyLibrary(e));
+    entities = pim.entities().filter((e) => !isThirdPartyLibrary(e) && !isStructuralFolderWrapper(e));
     if (entities.length < 2) {
       entities = [...pim.entities()];
     }
@@ -283,7 +311,6 @@ export function pimToDiagramPlan(
     relationships.push({
       source: r.source,
       target: r.target,
-      label: r.kind === 'dependsOn' ? 'depends' : r.kind,
       type: mapRelationKindToType(r.kind),
       direction: 'forward',
     });
@@ -316,7 +343,6 @@ export function pimToDiagramPlan(
           relationships.push({
             source: src,
             target,
-            label: 'calls',
             type: 'flow',
             direction: 'forward',
           });

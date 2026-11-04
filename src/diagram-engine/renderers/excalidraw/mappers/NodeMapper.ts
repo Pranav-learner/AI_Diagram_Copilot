@@ -82,6 +82,7 @@ export function renderNode(
       strokeWidth: mapped.strokeWidth,
       strokeStyle: mapped.strokeStyle,
       opacity: mapped.opacity,
+      roughness: (node.metadata as Record<string, unknown> | undefined)?.roughness as number | undefined,
       groupIds: placement.groupIds,
       frameId: placement.frameId,
       locked: node.locked,

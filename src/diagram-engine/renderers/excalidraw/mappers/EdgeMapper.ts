@@ -101,6 +101,7 @@ export function renderEdge(
       strokeWidth: mapped.strokeWidth,
       strokeStyle: mapped.strokeStyle,
       opacity: mapped.opacity,
+      roughness: (edge.metadata as Record<string, unknown> | undefined)?.roughness as number | undefined,
       roundness: routingRoundness(edge.routing),
       locked: edge.locked,
       boundElements: hasLabel ? [{ type: 'text', id: labelId }] : undefined,
