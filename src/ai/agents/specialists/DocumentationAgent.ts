@@ -40,17 +40,45 @@ export class DocumentationAgent extends BaseSpecialistAgent {
       return mockData;
     }
 
-    await this.invokeTool('knowledge:query', { query: 'Query documentation topics' }, context.executionContext);
+    const input = context.executionContext.metadata.inputData || { topic: 'Architecture & Overview' };
+    const topic = input.topic || 'System Architecture';
+
+    await this.invokeTool('knowledge:query', { query: `Query documentation for ${topic}` }, context.executionContext);
+
+    const files = this.getRepoFiles(context.executionContext);
+    const entities = this.getEntities(context.executionContext);
+    const readmeFile = files.find((f) => /readme\.md$/i.test(f.path));
+
+    const docTitle = `${topic} Documentation`;
+    const sections = ['Overview', 'Key Components', 'Module Details', 'Operational Notes'];
+
+    const componentBullets = entities.length > 0
+      ? entities.slice(0, 5).map((e) => `- **${e.name}**: ${e.kind || 'Component'}`).join('\n')
+      : files.slice(0, 5).map((f) => `- \`${f.path}\``).join('\n');
+
+    const contentMarkdown = `# ${docTitle}
+
+## Overview
+This technical documentation outlines the structure and design of the codebase focused on **${topic}**.
+
+## Key Components
+${componentBullets || '- Core system modules'}
+
+## Operational Notes
+- Designed for local verification and autonomous intelligence extraction.
+`;
+
+    const evidenceSource = readmeFile ? readmeFile.path : (files[0]?.path || 'README.md');
 
     return {
       data: {
-        docTitle: 'System Setup Guide',
-        contentMarkdown: '# System Setup\nThis guides you through setting up...',
-        sections: ['System Setup', 'Installation', 'Verifying Setup'],
+        docTitle,
+        contentMarkdown,
+        sections,
       },
-      evidence: [{ source: 'README.md', origin: 'document', confidence: 0.9, method: 'documentation' }],
-      confidence: 0.92,
-      recommendations: ['Add troubleshooting section to setup guide'],
+      evidence: [{ source: evidenceSource, origin: 'document', confidence: 0.94, method: 'documentation' }],
+      confidence: 0.94,
+      recommendations: ['Keep API and architecture documentation synchronized with code changes'],
     };
   }
 }

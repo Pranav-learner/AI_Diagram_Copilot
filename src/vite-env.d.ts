@@ -7,4 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_ANTHROPIC_API_KEY?: string;
   /** OpenAI API key. Used when no Anthropic key is present. */
   readonly VITE_OPENAI_API_KEY?: string;
+  /** Google Gemini API key. Used when set or selected. */
+  readonly VITE_GEMINI_API_KEY?: string;
+  /** Optional Gemini model override (defaults to gemini-1.5-pro). */
+  readonly VITE_GEMINI_MODEL?: string;
 }

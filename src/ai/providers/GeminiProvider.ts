@@ -14,7 +14,7 @@ import { parseSSE } from './http';
 import type { HttpProviderConfig } from './base';
 import { raiseForStatus, requireKey, resolveTransport } from './base';
 
-const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
+const DEFAULT_BASE_URL = typeof window !== 'undefined' ? '/api/ai/gemini' : 'https://generativelanguage.googleapis.com';
 
 export class GeminiProvider implements AIProvider {
   readonly id = 'gemini';
@@ -74,13 +74,18 @@ export class GeminiProvider implements AIProvider {
   }
 
   private post(request: ResolvedRequest, method: string, signal?: AbortSignal, sse = false) {
-    const key = requireKey(this.id, this.config);
     const baseURL = this.config.baseURL ?? DEFAULT_BASE_URL;
-    const query = sse ? '?alt=sse' : '';
+    const isProxy = baseURL.startsWith('/api') || baseURL.includes('/api/ai');
+    const key = isProxy ? (this.config.apiKey || '') : requireKey(this.id, this.config);
+    const query = sse ? (key ? `?alt=sse&key=${encodeURIComponent(key)}` : '?alt=sse') : (key ? `?key=${encodeURIComponent(key)}` : '');
+    const headers: Record<string, string> = { 'content-type': 'application/json', ...this.config.headers };
+    if (key && !isProxy) {
+      headers['x-goog-api-key'] = key;
+    }
     return resolveTransport(this.config)({
       url: `${baseURL}/v1beta/models/${request.model}:${method}${query}`,
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': key, ...this.config.headers },
+      headers,
       body: JSON.stringify(this.body(request)),
       signal,
     });

@@ -117,6 +117,7 @@ export class DiagramGenerator {
   private readonly contextSource?: DiagramContextSource;
   private readonly validator: ResponseValidator;
   private readonly executionPlanner: ExecutionPlanner;
+  private readonly typeRegistry?: DiagramTypeRegistry;
   private readonly promptRef: TemplateRef;
   private readonly maxPlanAttempts: number;
   private readonly now: () => number;
@@ -125,6 +126,7 @@ export class DiagramGenerator {
   constructor(deps: DiagramGeneratorDeps) {
     this.service = deps.service;
     this.gateway = deps.gateway;
+    this.typeRegistry = deps.typeRegistry;
     this.promptBuilder = deps.promptBuilder ?? new PromptBuilder();
     // Ensure the generation template is registered regardless of who built the builder.
     if (!this.promptBuilder.registryRef.has(GENERATION_PROMPT_ID)) {
@@ -236,6 +238,67 @@ export class DiagramGenerator {
         timings: { totalMs: this.now() - started, planningMs, validationMs, layoutMs, executionMs },
         warnings,
         attempts: attempt,
+      };
+    } catch (error) {
+      observer.onStage?.({ stage: currentStage, state: 'error', detail: errorMessage(error) });
+      throw error;
+    }
+  }
+
+  /**
+   * Applies an existing, validated semantic DiagramPlan directly to the canvas
+   * (e.g. from PIM or an autonomous agent) without making an LLM call.
+   */
+  applyPlan(plan: DiagramPlan, observer: GenerationObserver = {}): GenerationResult {
+    const started = this.now();
+    let currentStage: GenerationPhase = 'validating';
+    const stage = (phase: GenerationPhase, state: StageState, detail?: string) => {
+      currentStage = phase;
+      observer.onStage?.({ stage: phase, state, detail });
+    };
+
+    try {
+      stage('validating', 'active');
+      const valStart = this.now();
+      const validation = validatePlan(plan, { typeRegistry: this.typeRegistry });
+      if (!validation.ok) {
+        const msg = validation.errors.map((e) => e.message).join('; ');
+        throw new GenerationError('validating', `Invalid diagram plan: ${msg}`);
+      }
+      const validationMs = this.now() - valStart;
+      stage('validating', 'done');
+
+      stage('layout', 'active');
+      const layoutStart = this.now();
+      const ctx = this.executionPlanner.computeLayout(plan);
+      const layoutMs = this.now() - layoutStart;
+      stage('layout', 'done', `${plan.nodes.length} nodes`);
+
+      stage('executing', 'active');
+      const execStart = this.now();
+      const execution = this.executionPlanner.compile(plan, ctx);
+      this.assertKnownOperations(execution);
+      const applied = this.gateway.apply(execution.operations);
+      const executionMs = this.now() - execStart;
+      stage('executing', 'done', `${applied.applied} operations`);
+
+      stage('rendering', 'active');
+      stage('rendering', 'done');
+
+      return {
+        plan,
+        execution,
+        applied,
+        usage: ZERO_USAGE,
+        timings: {
+          totalMs: this.now() - started,
+          planningMs: 0,
+          validationMs,
+          layoutMs,
+          executionMs,
+        },
+        warnings: validation.warnings,
+        attempts: 1,
       };
     } catch (error) {
       observer.onStage?.({ stage: currentStage, state: 'error', detail: errorMessage(error) });

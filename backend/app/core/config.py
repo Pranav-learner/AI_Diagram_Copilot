@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # Reject diagram payloads larger than this (protects the DB from abuse).
     max_scene_bytes: int = 5 * 1024 * 1024  # 5 MB
 
+    # Google Gemini API key for local AI features. Stored securely on backend only.
+    gemini_api_key: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"

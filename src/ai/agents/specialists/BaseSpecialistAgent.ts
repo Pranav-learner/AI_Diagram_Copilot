@@ -3,6 +3,9 @@ import type { ExecutionContext } from '../../execution/ExecutionContext';
 import type { AgentManifest } from '../contracts/AgentManifest';
 import type { AgentContext, AgentOutput } from '../contracts/AgentContract';
 import { AgentValidator } from '../contracts/AgentValidator';
+import { KnowledgeQueryTool } from '../../tools/KnowledgeQueryTool';
+import { RepositorySearchTool } from '../../tools/RepositorySearchTool';
+import { ASTInspectTool } from '../../tools/ASTInspectTool';
 
 export abstract class BaseSpecialistAgent implements ExecutionUnit {
   readonly abstract manifest: AgentManifest;
@@ -104,7 +107,7 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
         executionMetadata: {
           latencyMs: Date.now() - startTime,
           tokenUsage: rawResult.tokenUsage || { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-          modelUsed: rawResult.modelUsed || this.manifest.supportedModels[0] || 'mock-model',
+          modelUsed: rawResult.modelUsed || this.manifest.supportedModels[0] || 'gemini-1.5-pro',
           cost: rawResult.cost ?? 0.0,
           retries,
         },
@@ -133,7 +136,7 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
   }
 
   /**
-   * Invokes tools via AEF registry (so agents invoke tools through the AI Execution Framework).
+   * Invokes tools via AEF registry or direct tool instances.
    */
   protected async invokeTool(toolId: string, args: any, context: ExecutionContext): Promise<any> {
     if (!this.manifest.supportedTools.includes(toolId)) {
@@ -143,7 +146,54 @@ export abstract class BaseSpecialistAgent implements ExecutionUnit {
     if (framework && typeof framework.executeTool === 'function') {
       return framework.executeTool(toolId, args, context);
     }
+    const registry = context.metadata.toolRegistry;
+    if (registry && typeof registry.executeTool === 'function') {
+      return registry.executeTool(toolId, args, context);
+    }
+    if (toolId === 'knowledge:query') {
+      const tool = new KnowledgeQueryTool();
+      return tool.execute(args, context);
+    }
+    if (toolId === 'repository:search') {
+      const tool = new RepositorySearchTool();
+      return tool.execute(args, context);
+    }
+    if (toolId === 'ast:inspect') {
+      const tool = new ASTInspectTool();
+      return tool.execute(args, context);
+    }
     return { success: true, toolCalled: toolId, args };
+  }
+
+  /**
+   * Helper to retrieve repository files from execution context or RE engine.
+   */
+  protected getRepoFiles(context: ExecutionContext): Array<{ path: string; content: string }> {
+    if (Array.isArray(context.metadata.files)) {
+      return context.metadata.files;
+    }
+    const reEngine = context.metadata.reEngine;
+    if (reEngine && typeof reEngine.asTList === 'function') {
+      return reEngine.asTList().map((ast: any) => ({
+        path: ast.file,
+        content: '',
+      }));
+    }
+    return [];
+  }
+
+  /**
+   * Helper to retrieve code entities from PIM or RE engine.
+   */
+  protected getEntities(context: ExecutionContext): any[] {
+    if (context.metadata.pim?.entities && Array.isArray(context.metadata.pim.entities)) {
+      return context.metadata.pim.entities;
+    }
+    const reEngine = context.metadata.reEngine;
+    if (reEngine && typeof reEngine.entities === 'function') {
+      return reEngine.entities();
+    }
+    return [];
   }
 
   /**

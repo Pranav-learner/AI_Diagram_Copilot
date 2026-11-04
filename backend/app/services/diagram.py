@@ -5,6 +5,7 @@ and version/concurrency rules, but never interprets Excalidraw structure.
 """
 
 import json
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import func
@@ -53,7 +54,7 @@ class DiagramService:
         diagram.data = payload.data
         diagram.version += 1
         # Bump the parent project's updated_at so the dashboard reflects activity.
-        diagram.project.updated_at = func.now()
+        diagram.project.updated_at = datetime.now(timezone.utc)
 
         self.db.commit()
         self.db.refresh(diagram)

@@ -10,6 +10,7 @@
 // Model: the strongly-typed plan + the diagram-type registry.
 export * from './model/DiagramType';
 export * from './model/DiagramPlan';
+export * from './model/PimToDiagramAdapter';
 
 // Layout: app-side positioning.
 export * from './layout';

@@ -48,17 +48,54 @@ export class DiagramAgent extends BaseSpecialistAgent {
     // Call tool
     await this.invokeTool('diagram:generate', { prompt: 'Generate layout' }, context.executionContext);
 
+    const entities = this.getEntities(context.executionContext);
+    const files = this.getRepoFiles(context.executionContext);
+
+    const elements: Array<{ id: string; type: string; label: string }> = [];
+
+    if (entities.length > 0) {
+      for (let i = 0; i < Math.min(entities.length, 12); i++) {
+        const ent = entities[i];
+        elements.push({
+          id: ent.id || `el_${i + 1}`,
+          type: 'rectangle',
+          label: ent.name || `Component ${i + 1}`,
+        });
+      }
+    } else if (files.length > 0) {
+      for (let i = 0; i < Math.min(files.length, 8); i++) {
+        const f = files[i];
+        const baseName = f.path.split('/').pop()?.replace(/\.[^/.]+$/, '') || `Node_${i + 1}`;
+        elements.push({
+          id: `el_${i + 1}`,
+          type: 'rectangle',
+          label: baseName,
+        });
+      }
+    }
+
+    if (elements.length === 0) {
+      elements.push(
+        { id: 'el_1', type: 'rectangle', label: 'Client / Interface' },
+        { id: 'el_2', type: 'rectangle', label: 'Backend Controller' }
+      );
+    }
+
+    const evidence = (files.length > 0 ? files : [{ path: 'architecture.pim' }]).slice(0, 2).map((f) => ({
+      source: f.path,
+      origin: 'diagram',
+      confidence: 0.98,
+      method: 'diagram',
+    }));
+
     return {
       data: {
-        diagramId: 'diag_001',
-        elements: [
-          { id: 'el_1', type: 'rectangle', label: 'User Client' },
-          { id: 'el_2', type: 'rectangle', label: 'API Gateway' },
-        ],
+        diagramId: `diag_${Date.now()}`,
+        elements,
       },
-      evidence: [{ source: 'system-layout.json', origin: 'diagram', confidence: 0.98, method: 'diagram' }],
+      evidence,
       confidence: 0.98,
-      recommendations: ['Group database elements inside a storage boundary'],
+      recommendations: ['Group related components inside functional subsystem boundaries'],
     };
   }
 }

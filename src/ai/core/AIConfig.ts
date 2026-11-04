@@ -70,11 +70,11 @@ export interface AIConfig {
 
 /** The shipped default configuration. Frozen so it can be shared safely. */
 export const defaultAIConfig: AIConfig = Object.freeze({
-  provider: 'anthropic',
+  provider: 'gemini',
   models: Object.freeze({
-    default: { model: 'claude-opus-4-8', temperature: 0.2, maxTokens: 4096 },
-    fast: { model: 'claude-haiku-4-5-20251001', temperature: 0, maxTokens: 1024 },
-    reasoning: { model: 'claude-opus-4-8', temperature: 0.1, maxTokens: 8192 },
+    default: { model: 'gemini-1.5-pro', temperature: 0.2, maxTokens: 4096 },
+    fast: { model: 'gemini-1.5-flash', temperature: 0, maxTokens: 1024 },
+    reasoning: { model: 'gemini-1.5-pro', temperature: 0.1, maxTokens: 8192 },
   }),
   retry: Object.freeze({
     maxRetries: 2,

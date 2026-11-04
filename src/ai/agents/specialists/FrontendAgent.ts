@@ -41,18 +41,38 @@ export class FrontendAgent extends BaseSpecialistAgent {
       return mockData;
     }
 
-    await this.invokeTool('repository:search', { query: 'Search frontend component' }, context.executionContext);
+    const input = context.executionContext.metadata.inputData || { componentName: 'MainView' };
+    const componentName = input.componentName || 'View';
+
+    await this.invokeTool('repository:search', { query: componentName }, context.executionContext);
+
+    const files = this.getRepoFiles(context.executionContext);
+    let framework = 'React';
+    let stylePreset = 'Tailwind CSS';
+
+    if (files.some((f) => f.path.endsWith('.vue'))) {
+      framework = 'Vue';
+      stylePreset = 'Scoped CSS';
+    } else if (files.some((f) => f.path.endsWith('.svelte'))) {
+      framework = 'Svelte';
+      stylePreset = 'Svelte Scoped CSS';
+    } else if (files.some((f) => f.content.includes('styled-components'))) {
+      stylePreset = 'Styled Components';
+    }
+
+    const matchingFile = files.find((f) => f.path.toLowerCase().includes(componentName.toLowerCase()));
+    const evidenceSource = matchingFile ? matchingFile.path : (files.find((f) => /\.(tsx|jsx|vue)$/.test(f.path))?.path || `src/components/${componentName}.tsx`);
 
     return {
       data: {
-        framework: 'React',
-        stylePreset: 'CSS Modules',
-        markup: '<div className={styles.container}>User profile element</div>',
-        props: ['userId', 'onSave'],
+        framework,
+        stylePreset,
+        markup: `<div className="component-${componentName.toLowerCase()}"><header>${componentName}</header><main>{/* Content */}</main></div>`,
+        props: ['id', 'className', 'onAction'],
       },
-      evidence: [{ source: 'src/components/UserProfile.tsx', origin: 'code', confidence: 0.95, method: 'static-analysis' }],
+      evidence: [{ source: evidenceSource, origin: 'code', confidence: 0.95, method: 'static-analysis' }],
       confidence: 0.95,
-      recommendations: ['Add accessibility role attributes to markup container'],
+      recommendations: ['Ensure appropriate ARIA accessibility attributes and responsive layouts'],
     };
   }
 }

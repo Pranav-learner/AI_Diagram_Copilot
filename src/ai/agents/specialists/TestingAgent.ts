@@ -45,22 +45,54 @@ export class TestingAgent extends BaseSpecialistAgent {
       return mockData;
     }
 
-    await this.invokeTool('repository:search', { query: 'Search test configurations' }, context.executionContext);
+    const input = context.executionContext.metadata.inputData || { targetFile: 'src/main.ts' };
+    const targetFile = input.targetFile || 'index.ts';
+
+    await this.invokeTool('repository:search', { query: 'test|spec|assert' }, context.executionContext);
+
+    const files = this.getRepoFiles(context.executionContext);
+    let testFramework = 'Vitest';
+
+    if (files.some((f) => f.path.endsWith('.java'))) {
+      testFramework = 'JUnit 5';
+    } else if (files.some((f) => f.path.endsWith('.py'))) {
+      testFramework = 'pytest';
+    } else if (files.some((f) => f.content.includes('jest'))) {
+      testFramework = 'Jest';
+    }
+
+    const baseName = targetFile.split('/').pop()?.replace(/\.[^/.]+$/, '') || 'module';
+    const testCases: Array<{ name: string; description: string; assertions: string[] }> = [
+      {
+        name: `should initialize and execute ${baseName} operations`,
+        description: `Verifies standard execution and valid state transitions for ${baseName}`,
+        assertions: testFramework === 'JUnit 5'
+          ? ['assertNotNull(result)', 'assertEquals(Status.SUCCESS, result.getStatus())']
+          : testFramework === 'pytest'
+          ? ['assert result is not None', 'assert result.status == "success"']
+          : ['expect(result).toBeDefined()', 'expect(result.status).toBe("success")'],
+      },
+      {
+        name: `should handle error conditions gracefully in ${baseName}`,
+        description: `Verifies error throwing and boundary validation when invalid inputs are provided to ${baseName}`,
+        assertions: testFramework === 'JUnit 5'
+          ? ['assertThrows(IllegalArgumentException.class, () -> execute(null))']
+          : testFramework === 'pytest'
+          ? ['with pytest.raises(ValueError): execute(None)']
+          : ['expect(() => execute(null)).toThrow()'],
+      },
+    ];
+
+    const evidenceSource = files.find((f) => f.path.includes(targetFile))?.path || targetFile;
 
     return {
       data: {
-        testFramework: 'Vitest',
-        testCases: [
-          {
-            name: 'should create user correctly',
-            description: 'asserts that valid user payloads return created status',
-            assertions: ['expect(res.status).toBe(201)', 'expect(res.body.id).toBeDefined()'],
-          },
-        ],
+        testFramework,
+        testCases,
       },
-      evidence: [{ source: 'src/routes/__tests__/users.test.ts', origin: 'code', confidence: 0.97, method: 'static-analysis' }],
+      evidence: [{ source: evidenceSource, origin: 'code', confidence: 0.97, method: 'static-analysis' }],
       confidence: 0.98,
-      recommendations: ['Utilize factories for generating setup user data'],
+      recommendations: [`Maintain at least 80% branch coverage for critical paths in ${baseName}`],
     };
   }
 }

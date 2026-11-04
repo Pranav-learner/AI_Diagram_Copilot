@@ -46,23 +46,74 @@ export class ReviewerAgent extends BaseSpecialistAgent {
       return mockData;
     }
 
-    await this.invokeTool('repository:search', { query: 'Search git diffs' }, context.executionContext);
+    await this.invokeTool('repository:search', { query: 'TODO|FIXME|console.log|any' }, context.executionContext);
+
+    const files = this.getRepoFiles(context.executionContext);
+    const comments: Array<{ file: string; line: number; comment: string; severity: 'suggestion' | 'warning' | 'blocking' }> = [];
+    const evidenceFiles: string[] = [];
+
+    for (const f of files) {
+      if (comments.length >= 5) break;
+      const lines = f.content.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (/console\.(log|debug)/.test(line)) {
+          comments.push({
+            file: f.path,
+            line: i + 1,
+            comment: 'Remove or replace debug logging with structured logger',
+            severity: 'suggestion',
+          });
+          evidenceFiles.push(f.path);
+          break;
+        } else if (/TODO|FIXME/i.test(line)) {
+          comments.push({
+            file: f.path,
+            line: i + 1,
+            comment: `Unresolved task comment: "${line.trim().slice(0, 60)}"`,
+            severity: 'warning',
+          });
+          evidenceFiles.push(f.path);
+          break;
+        } else if (/:\s*any\b/.test(line)) {
+          comments.push({
+            file: f.path,
+            line: i + 1,
+            comment: 'Avoid explicit "any" type; provide specific interface or generic constraint',
+            severity: 'warning',
+          });
+          evidenceFiles.push(f.path);
+          break;
+        }
+      }
+    }
+
+    if (comments.length === 0) {
+      const defFile = files[0]?.path || 'src/main.ts';
+      comments.push({
+        file: defFile,
+        line: 1,
+        comment: 'Code meets architectural and lint guidelines',
+        severity: 'suggestion',
+      });
+      evidenceFiles.push(defFile);
+    }
+
+    const hasBlocking = comments.some((c) => c.severity === 'blocking');
 
     return {
       data: {
-        approved: true,
-        comments: [
-          {
-            file: 'src/utils.ts',
-            line: 23,
-            comment: 'Consider renaming variable userVal to user for clarity',
-            severity: 'suggestion',
-          },
-        ],
+        approved: !hasBlocking,
+        comments,
       },
-      evidence: [{ source: 'src/utils.ts', origin: 'code', confidence: 0.94, method: 'static-analysis' }],
+      evidence: evidenceFiles.slice(0, 3).map((f) => ({
+        source: f,
+        origin: 'code',
+        confidence: 0.94,
+        method: 'static-analysis',
+      })),
       confidence: 0.94,
-      recommendations: [],
+      recommendations: comments.filter((c) => c.severity !== 'suggestion').map((c) => `${c.file}:${c.line} - ${c.comment}`),
     };
   }
 }

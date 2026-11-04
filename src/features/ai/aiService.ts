@@ -18,6 +18,7 @@ import {
   ProviderRegistry,
   AnthropicProvider,
   OpenAIProvider,
+  GeminiProvider,
   MockPlanProvider,
   MockEditProvider,
   MockExplainProvider,
@@ -81,21 +82,12 @@ export interface EditorAIBundle {
  * overrides. The one place the app selects a provider.
  */
 export function createEditorAIService(override: AIConfigOverride = {}): EditorAIBundle {
-  const env = import.meta.env;
   const registry = new ProviderRegistry();
   registry.register(new MockAssistantProvider());
+  // Register Gemini using the local FastAPI backend proxy (protecting GEMINI_API_KEY)
+  registry.register(new GeminiProvider({ baseURL: '/api/ai/gemini' }));
 
-  let autoProvider = 'mock-assistant';
-  if (env.VITE_ANTHROPIC_API_KEY) {
-    registry.register(new AnthropicProvider({ apiKey: env.VITE_ANTHROPIC_API_KEY }));
-    autoProvider = 'anthropic';
-  } else if (env.VITE_OPENAI_API_KEY) {
-    registry.register(new OpenAIProvider({ apiKey: env.VITE_OPENAI_API_KEY }));
-    autoProvider = 'openai';
-  }
-
-  // Honour a requested provider only when it is actually registered.
-  const providerId = override.provider && registry.has(override.provider) ? override.provider : autoProvider;
+  const providerId = override.provider && registry.has(override.provider) ? override.provider : 'gemini';
   const config = mergeConfig({ ...override, provider: providerId });
 
   const metrics = new AIMetrics();

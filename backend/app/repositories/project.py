@@ -11,7 +11,9 @@ class ProjectRepository(BaseRepository[Project]):
 
     def list_recent(self) -> list[Project]:
         """All projects, most-recently-updated first."""
-        stmt = select(Project).order_by(Project.updated_at.desc())
+        stmt = select(Project).order_by(
+            Project.updated_at.desc(), Project.created_at.desc(), Project.id.desc()
+        )
         return list(self.db.scalars(stmt))
 
     def count(self) -> int:

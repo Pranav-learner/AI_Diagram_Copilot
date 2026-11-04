@@ -52,18 +52,49 @@ export class DevOpsAgent extends BaseSpecialistAgent {
 
     await this.invokeTool('knowledge:query', { query: 'Query deploy files' }, context.executionContext);
 
+    const files = this.getRepoFiles(context.executionContext);
+    const infraFiles = files.filter((f) =>
+      /dockerfile|docker-compose|\.github\/workflows|terraform|k8s|kubernetes|helm/i.test(f.path)
+    );
+
+    const pipelines: Array<{ name: string; steps: string[] }> = [];
+    const infrastructure: Array<{ provider: string; resourceType: string; name: string }> = [];
+
+    for (const f of infraFiles) {
+      if (/docker-compose/i.test(f.path)) {
+        infrastructure.push({ provider: 'docker-compose', resourceType: 'service_stack', name: 'local-services' });
+      } else if (/dockerfile/i.test(f.path)) {
+        infrastructure.push({ provider: 'docker', resourceType: 'container_image', name: 'app-image' });
+      } else if (/workflows/i.test(f.path)) {
+        const wfName = f.path.split('/').pop()?.replace(/\.ya?ml$/, '') || 'ci';
+        pipelines.push({ name: wfName, steps: ['checkout', 'test', 'build'] });
+      } else if (/k8s|kubernetes/i.test(f.path)) {
+        infrastructure.push({ provider: 'kubernetes', resourceType: 'deployment', name: 'cluster-service' });
+      }
+    }
+
+    if (pipelines.length === 0) {
+      pipelines.push({ name: 'CI Pipeline', steps: ['lint', 'unit-tests', 'build-artifact'] });
+    }
+    if (infrastructure.length === 0) {
+      infrastructure.push({ provider: 'container', resourceType: 'container_service', name: 'local-app' });
+    }
+
+    const evidence = (infraFiles.length > 0 ? infraFiles : files).slice(0, 2).map((f) => ({
+      source: f.path,
+      origin: 'infrastructure',
+      confidence: 0.95,
+      method: 'infrastructure',
+    }));
+
     return {
       data: {
-        pipelines: [
-          { name: 'CI Build', steps: ['lint', 'test', 'build-docker'] },
-        ],
-        infrastructure: [
-          { provider: 'aws', resourceType: 'ecs_service', name: 'api-service' },
-        ],
+        pipelines,
+        infrastructure,
       },
-      evidence: [{ source: 'docker-compose.yml', origin: 'infrastructure', confidence: 0.94, method: 'infrastructure' }],
+      evidence: evidence.length > 0 ? evidence : [{ source: 'Dockerfile', origin: 'infrastructure', confidence: 0.94, method: 'infrastructure' }],
       confidence: 0.94,
-      recommendations: ['Enable branch protections for release deployments'],
+      recommendations: ['Enable strict branch protection and automated container vulnerability scanning'],
     };
   }
 }

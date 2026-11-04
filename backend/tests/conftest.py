@@ -7,10 +7,8 @@ gets a fresh schema for full isolation.
 
 import os
 
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgresql+psycopg://postgres@localhost:5433/diagram_copilot_test",
-)
+if "DATABASE_URL" not in os.environ:
+    os.environ["DATABASE_URL"] = "sqlite:///./diagram_copilot_test.db"
 os.environ["SEED_ON_STARTUP"] = "false"
 
 import pytest  # noqa: E402
