@@ -103,3 +103,4 @@ describe('AI Tools Registry and Implementations', () => {
     await expect(registry.executeTool('knowledge:query', {}, ctx)).rejects.toThrow('Permission denied');
   });
 });
+

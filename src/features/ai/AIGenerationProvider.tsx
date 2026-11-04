@@ -50,6 +50,7 @@ export function AIGenerationProvider({ children }: { children: ReactNode }) {
     const intelligence = new IntelligenceEngine({ service: bundle.service, graphSource: understanding, stream: streaming });
     const intentAnalyzer = new RuleBasedIntentAnalyzer();
     return {
+      service: bundle.service,
       generator,
       editor,
       explain,

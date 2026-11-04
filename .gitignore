@@ -1,21 +1,108 @@
-# Logs
-logs
+# =============================================================================
+# AI Diagram Copilot — Root .gitignore
+# Prevents secrets, environment configs, databases, dependencies & builds
+# from being committed to public GitHub repositories.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Secrets & Environment Files (CRITICAL: NEVER COMMIT TO PUBLIC GITHUB)
+# -----------------------------------------------------------------------------
+.env
+.env.*
+*.env
+!*.env.example
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+credentials.json
+client_secret*.json
+id_rsa
+id_ed25519
+
+# -----------------------------------------------------------------------------
+# 2. Databases & Persistent Storage
+# -----------------------------------------------------------------------------
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+.pgdata/
+postgres-data/
+
+# -----------------------------------------------------------------------------
+# 3. Node.js & Frontend Builds
+# -----------------------------------------------------------------------------
+node_modules/
+dist/
+dist-ssr/
+build/
+out/
+.turbo/
+.parcel-cache/
+.vite/
+
+# Node logs
+logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Dependencies
-node_modules
-dist
-dist-ssr
-*.local
+# -----------------------------------------------------------------------------
+# 4. Python & Backend Environments
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+*.egg
+.eggs/
 
-# Editor
+# -----------------------------------------------------------------------------
+# 5. OS & IDE Metadata
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# JetBrains / IntelliJ / PyCharm / WebStorm
+.idea/
+*.iws
+*.iml
+
+# Visual Studio Code (preserves team extension recommendations)
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+
+# Visual Studio / Windows
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.bak
+*.tmp
+
+# -----------------------------------------------------------------------------
+# 6. Temporary & Local Files
+# -----------------------------------------------------------------------------
+*.local
+scratch/
+tmp/
+temp/

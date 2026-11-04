@@ -22,12 +22,32 @@ import {
   Code,
   Layers,
   Upload,
+  FolderUp,
+  Download,
+  AlertTriangle,
+  Flame,
+  FileCode2,
+  CheckSquare,
 } from 'lucide-react';
 import { useProjectIntelligenceStore } from '../store/useProjectIntelligenceStore';
 import { SAMPLE_PROJECTS } from '../store/sampleRepositories';
 import { AIGenerationContext } from '../AIGenerationContext';
 import { Markdown } from './Markdown';
-import type { DiagramPlan } from '@/ai/generation/model/DiagramPlan';
+import { ingestFileList } from '../lib/repositoryIngestion';
+import { pimToDiagramPlan, type DiagramViewType } from '@/ai/generation';
+import {
+  ExecutionFramework,
+  ExecutionContext,
+  AgentMemory,
+  ArchitectureAgent,
+  SecurityAgent,
+  ReviewerAgent,
+  DocumentationAgent,
+  DevOpsAgent,
+  DatabaseAgent,
+  TestingAgent,
+  RepositoryAgent,
+} from '@/ai';
 
 interface ChatMessage {
   id: string;
@@ -38,29 +58,78 @@ interface ChatMessage {
   evidence?: { source: string; origin: string; location?: string; confidence: number; method: string }[];
 }
 
+interface MissionPreset {
+  id: string;
+  name: string;
+  description: string;
+  agents: string[];
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const MISSION_PRESETS: MissionPreset[] = [
+  {
+    id: 'architecture-analysis',
+    name: 'Repository Architecture Analysis',
+    description: 'Deconstructs repository layers, styles, patterns, and component topologies using Architecture, DevOps & Database agents.',
+    agents: ['architecture-agent', 'devops-agent', 'database-agent'],
+    icon: Layers,
+  },
+  {
+    id: 'architecture-review',
+    name: 'Comprehensive Architecture Review',
+    description: 'Evaluates architectural integrity, coupling, circular dependencies, and security boundaries with Architecture, Security & Reviewer agents.',
+    agents: ['architecture-agent', 'security-agent', 'reviewer-agent'],
+    icon: ShieldAlert,
+  },
+  {
+    id: 'security-audit',
+    name: 'Security Vulnerability Audit',
+    description: 'Scans dependency manifests and source files for secret leaks, unvalidated inputs, and vulnerabilities with Security & Reviewer agents.',
+    agents: ['security-agent', 'reviewer-agent', 'testing-agent'],
+    icon: Flame,
+  },
+  {
+    id: 'full-documentation',
+    name: 'Reverse-Engineering & System Docs',
+    description: 'Generates comprehensive documentation, component catalogues, and test plans with Documentation, Backend & Testing agents.',
+    agents: ['documentation-agent', 'backend-agent', 'testing-agent'],
+    icon: FileText,
+  },
+];
+
 export function SoftwareIntelligenceWorkspace() {
   const store = useProjectIntelligenceStore();
   const context = useContext(AIGenerationContext);
   const generator = context?.generator;
 
   // UI view selectors
-  const [centerTab, setCenterTab] = useState<'explorer' | 'map'>('explorer');
+  const [centerTab, setCenterTab] = useState<'explorer' | 'map' | 'missions'>('explorer');
   const [rightTab, setRightTab] = useState<'chat' | 'observability'>('chat');
   const [selectedOntology, setSelectedOntology] = useState<string>('all');
   const [expandedEntity, setExpandedEntity] = useState<string | null>(null);
   const [hoveredEntity, setHoveredEntity] = useState<string | null>(null);
-  
-  // Custom file upload simulator state
+  const [selectedViewType, setSelectedViewType] = useState<DiagramViewType>('architecture');
+
+  // Custom file upload state
   const [customFileCount, setCustomFileCount] = useState(0);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Chat State
   const [chatInput, setChatInput] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [activeTimeline, setActiveTimeline] = useState<any[]>([]);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+
+  // Autonomous Missions State
+  const [activeMissionId, setActiveMissionId] = useState<string | null>(null);
+  const [isMissionRunning, setIsMissionRunning] = useState(false);
+  const [missionProgress, setMissionProgress] = useState(0);
+  const [missionLogs, setMissionLogs] = useState<string[]>([]);
+  const [missionReport, setMissionReport] = useState<any | null>(null);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const missionLogsEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll logs to bottom
   useEffect(() => {
@@ -74,7 +143,14 @@ export function SoftwareIntelligenceWorkspace() {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [chatHistory, activeTimeline]);
+  }, [chatHistory, isGeneratingResponse]);
+
+  // Scroll mission logs
+  useEffect(() => {
+    if (missionLogsEndRef.current) {
+      missionLogsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [missionLogs]);
 
   // Load a default sample project if none loaded
   useEffect(() => {
@@ -83,28 +159,24 @@ export function SoftwareIntelligenceWorkspace() {
     }
   }, []);
 
-  const handleCustomFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const handleDirectoryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
 
-    const uploadedFiles: { path: string; content: string }[] = [];
-    let processed = 0;
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        uploadedFiles.push({
-          path: file.name,
-          content: (event.target?.result as string) || '',
-        });
-        processed++;
-        if (processed === files.length) {
-          store.importFiles(uploadedFiles, 'custom');
-          setCustomFileCount(files.length);
-        }
-      };
-      reader.readAsText(file);
+    try {
+      const ingested = await ingestFileList(fileList);
+      if (ingested.length === 0) {
+        alert('No parseable source code files found in selected upload.');
+        return;
+      }
+      setCustomFileCount(ingested.length);
+      await store.importFiles(
+        ingested.map((f) => ({ path: f.path, content: f.content })),
+        'custom'
+      );
+    } catch (err: any) {
+      console.error('Directory ingestion error:', err);
+      alert(`Directory upload error: ${err.message}`);
     }
   };
 
@@ -115,6 +187,7 @@ export function SoftwareIntelligenceWorkspace() {
 
     setChatInput('');
     setIsGeneratingResponse(true);
+    const startTime = Date.now();
 
     const userMsg: ChatMessage = {
       id: Math.random().toString(),
@@ -125,126 +198,91 @@ export function SoftwareIntelligenceWorkspace() {
 
     setChatHistory((prev) => [...prev, userMsg]);
 
-    // Initialize timeline stages
-    const stages = [
-      { stage: 'Intent Analyzer', status: 'active' },
-      { stage: 'Context Builder', status: 'pending' },
-      { stage: 'Planning', status: 'pending' },
-      { stage: 'Query Execution', status: 'pending' },
-      { stage: 'Evidence Compilation', status: 'pending' },
-      { stage: 'Response Generation', status: 'pending' },
-    ];
-    setActiveTimeline(stages);
-
-    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    const startTime = Date.now();
-
-    // Stage 1: Intent
-    await delay(350);
-    setActiveTimeline([
-      { stage: 'Intent Analyzer', status: 'done' },
-      { stage: 'Context Builder', status: 'active' },
-      { ...stages[2]! }, { ...stages[3]! }, { ...stages[4]! }, { ...stages[5]! }
-    ]);
-
-    // Stage 2: Context
-    await delay(400);
-    setActiveTimeline([
-      { stage: 'Intent Analyzer', status: 'done' },
-      { stage: 'Context Builder', status: 'done' },
-      { stage: 'Planning', status: 'active' },
-      { ...stages[3]! }, { ...stages[4]! }, { ...stages[5]! }
-    ]);
-
-    // Stage 3: Planning
-    await delay(300);
-    setActiveTimeline([
-      { stage: 'Intent Analyzer', status: 'done' },
-      { stage: 'Context Builder', status: 'done' },
-      { stage: 'Planning', status: 'done' },
-      { stage: 'Query Execution', status: 'active' },
-      { ...stages[4]! }, { ...stages[5]! }
-    ]);
-
-    // Stage 4: Query execution
-    await delay(500);
-    setActiveTimeline([
-      { stage: 'Intent Analyzer', status: 'done' },
-      { stage: 'Context Builder', status: 'done' },
-      { stage: 'Planning', status: 'done' },
-      { stage: 'Query Execution', status: 'done' },
-      { stage: 'Evidence Compilation', status: 'active' },
-      { ...stages[5]! }
-    ]);
-
-    // Stage 5: Evidence compile
-    await delay(300);
-    setActiveTimeline([
-      { stage: 'Intent Analyzer', status: 'done' },
-      { stage: 'Context Builder', status: 'done' },
-      { stage: 'Planning', status: 'done' },
-      { stage: 'Query Execution', status: 'done' },
-      { stage: 'Evidence Compilation', status: 'done' },
-      { stage: 'Response Generation', status: 'active' },
-    ]);
-
-    // Stage 6: Response generation & finalize
-    await delay(400);
-    setActiveTimeline([]);
-
-    // Query mock assistant provider logic directly in browser
-    const mockService = store.engine;
     let answerText = '';
-    let evidenceList: any[] = [];
+    const evidenceList: any[] = [];
 
-    if (store.pim) {
-      // Find matching entity
-      const lower = query.toLowerCase();
-      const entity = store.pim.entities().find(
-        (e) => lower.includes(e.name.toLowerCase()) || e.aliases.some((a) => lower.includes(a.toLowerCase()))
+    if (!store.pim) {
+      answerText = '### ⚠️ No Project Ingested\nPlease import or load a software repository first to build the PIM digital twin.';
+    } else {
+      const entities = store.pim.entities();
+      const relations = store.pim.relations();
+      const lowerQuery = query.toLowerCase();
+
+      const matchedEntities = entities.filter((ent) =>
+        lowerQuery.includes(ent.name.toLowerCase()) ||
+        ent.kind.toLowerCase().includes(lowerQuery) ||
+        ent.ontologyType.toLowerCase().includes(lowerQuery) ||
+        (ent.description && ent.description.toLowerCase().includes(lowerQuery)) ||
+        ent.tags.some((t) => lowerQuery.includes(t.toLowerCase())) ||
+        ent.aliases.some((a) => lowerQuery.includes(a.toLowerCase()))
       );
 
-      if (entity) {
-        evidenceList = entity.evidence.map((ev) => ({
-          source: ev.source || 'Unknown',
-          origin: ev.origin,
-          location: ev.location,
-          confidence: ev.confidence,
-          method: ev.method || 'AST Parse',
-        }));
+      const targetEntities = matchedEntities.length > 0 ? matchedEntities.slice(0, 8) : entities.slice(0, 5);
+
+      for (const ent of targetEntities) {
+        for (const ev of ent.evidence) {
+          evidenceList.push({
+            source: ev.source || 'repository',
+            origin: ev.origin,
+            location: ev.location,
+            confidence: ev.confidence,
+            method: ev.method || 'AST Parse',
+          });
+        }
       }
 
-      // Execute response generation
-      const systemPrompt = 'Project Intelligence System Prompt';
-      const response = await fetch('/api/dummy', { method: 'POST', body: JSON.stringify({ prompt: query }) }).catch(() => null);
-      
-      // Generate answer text using our local provider implementation helper
-      const provider = new (await import('../../project-intelligence/MockProjectIntelligenceProvider')).MockProjectIntelligenceProvider();
-      const mockRequest = {
-        model: 'gemini-3.1-pro',
-        messages: [
-          { role: 'system', content: 'Project Intelligence Copilot' },
-          { role: 'user', content: query }
-        ]
-      };
-      const result = await provider.complete(mockRequest as any);
-      answerText = result.text;
-    } else {
-      answerText = '### ⚠️ No Project Ingested\nPlease load a project first.';
+      const aiService = context?.service;
+      if (aiService) {
+        try {
+          const entitiesSummary = targetEntities
+            .map((e) => `- **${e.name}** (${e.ontologyType || e.kind}): ${e.description || 'Core entity'}`)
+            .join('\n');
+
+          const relatedEdges = relations
+            .filter((r) => targetEntities.some((te) => te.id === r.source || te.id === r.target))
+            .slice(0, 10)
+            .map((r) => `- ${r.source} -> [${r.kind}] -> ${r.target}`)
+            .join('\n');
+
+          const systemPrompt = `You are the AI Project Intelligence Copilot for software repositories.
+You are analyzing a verified Project Intelligence Model (PIM) digital twin.
+Context Entities:
+${entitiesSummary}
+
+Context Relations:
+${relatedEdges || 'None'}
+
+Answer questions with technical precision. Reference specific entities, files, and architectural relationships. Keep answers structured in Markdown with clear sections.`;
+
+          const response = await aiService.complete({
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: query },
+            ],
+            temperature: 0.2,
+            maxTokens: 1000,
+          });
+
+          answerText = response.text;
+        } catch (err: any) {
+          console.warn('AI service call failed, generating grounded PIM response:', err);
+          answerText = generateGroundedPimAnswer(query, targetEntities, relations);
+        }
+      } else {
+        answerText = generateGroundedPimAnswer(query, targetEntities, relations);
+      }
     }
 
     const latency = Date.now() - startTime;
     const tokens = Math.round(answerText.length / 3);
-
-    // Record metrics in the store
-    store.recordQueryMetrics(latency, tokens, true, Math.random() > 0.3);
+    store.recordQueryMetrics(latency, tokens, true, false);
 
     const assistantMsg: ChatMessage = {
       id: Math.random().toString(),
       role: 'assistant',
       content: answerText,
       timestamp: Date.now(),
-      evidence: evidenceList,
+      evidence: evidenceList.slice(0, 5),
     };
 
     setChatHistory((prev) => [...prev, assistantMsg]);
@@ -255,34 +293,129 @@ export function SoftwareIntelligenceWorkspace() {
     if (!store.pim || !generator) return;
 
     try {
-      const plan: DiagramPlan = {
-        diagramType: 'architecture',
-        title: `${store.pim.entities().length} Node Microservice Topology`,
-        description: 'Auto-generated visual map from the Project Intelligence Model.',
-        layout: 'horizontal',
-        nodes: store.pim.entities().map((e) => ({
-          id: e.id,
-          label: e.name,
-          type: e.kind,
-          description: e.description,
-          metadata: { category: e.category, confidence: e.confidence },
-        })),
-        relationships: store.pim.relations().map((r) => ({
-          source: r.source,
-          target: r.target,
-          label: r.kind,
-          type: 'flow',
-        })),
+      const plan = pimToDiagramPlan(store.pim, selectedViewType);
+      const res = generator.applyPlan(plan);
+      if (res.success) {
+        store.setActiveTab('canvas');
+      } else {
+        console.error('Failed to apply diagram plan:', res.error);
+        alert(`Failed to apply diagram plan: ${res.error?.message || 'Unknown error'}`);
+      }
+    } catch (e: any) {
+      console.error('Failed to auto-generate diagram on canvas', e);
+      alert(`Error generating diagram: ${e.message}`);
+    }
+  };
+
+  const handleRunMission = async (preset: MissionPreset) => {
+    if (!store.pim && store.files.length === 0) {
+      alert('Please load or import a repository first before launching an autonomous mission.');
+      return;
+    }
+
+    setActiveMissionId(preset.id);
+    setIsMissionRunning(true);
+    setMissionProgress(10);
+    setMissionLogs([`[AEF] Initializing mission: "${preset.name}"...`]);
+    setMissionReport(null);
+
+    try {
+      const framework = new ExecutionFramework();
+      const memory = new AgentMemory();
+
+      const agentMap: Record<string, any> = {
+        'architecture-agent': new ArchitectureAgent(),
+        'security-agent': new SecurityAgent(),
+        'reviewer-agent': new ReviewerAgent(),
+        'documentation-agent': new DocumentationAgent(),
+        'devops-agent': new DevOpsAgent(),
+        'database-agent': new DatabaseAgent(),
+        'backend-agent': new BackendAgent(),
+        'testing-agent': new TestingAgent(),
       };
 
-      const ctx = generator.executionPlanner.computeLayout(plan);
-      const execution = generator.executionPlanner.compile(plan, ctx);
-      generator.gateway.apply(execution.operations);
+      for (const [id, agent] of Object.entries(agentMap)) {
+        framework.execution.register(agent);
+      }
 
-      // Return user to Canvas tab to review the generated diagram
-      store.setActiveTab('canvas');
-    } catch (e) {
-      console.error('Failed to auto-generate diagram on canvas', e);
+      const missionId = `mission_${Date.now()}`;
+      const results: Record<string, any> = {};
+      const agentIds = preset.agents;
+      const stepPct = 80 / agentIds.length;
+      let currentPct = 15;
+
+      for (let i = 0; i < agentIds.length; i++) {
+        const agentId = agentIds[i];
+        const agent = agentMap[agentId];
+        if (!agent) continue;
+
+        setMissionLogs((prev) => [...prev, `[AEF] Step ${i + 1}/${agentIds.length}: Dispatching ${agent.name} (${agentId})...`]);
+
+        const handoffContext = memory.getHandoffContextForAgent(missionId, agentId);
+
+        const ctx = new ExecutionContext({
+          taskId: `task_${agentId}`,
+          sessionId: `session_${missionId}`,
+          userGoal: preset.name,
+          permissions: ['*'],
+          metadata: {
+            files: store.files,
+            pim: store.pim,
+            reEngine: store.engine?.knowledge(),
+            toolRegistry: framework.tools,
+            memory,
+            handoffContext,
+            aiService: context?.service,
+          },
+        });
+
+        const execResult = await agent.execute(ctx);
+        if (execResult.success) {
+          const output = (execResult.data as any) || {};
+          results[agentId] = output;
+
+          memory.recordHandoff({
+            missionId,
+            fromAgentId: agentId,
+            summary: `${agent.name} completed analysis`,
+            findings: output.data || {},
+            evidence: output.evidence || [],
+          });
+
+          setMissionLogs((prev) => [
+            ...prev,
+            `[AEF] ✓ ${agent.name} completed (${output.evidence?.length || 0} evidence citations, ${(output.confidence * 100).toFixed(0)}% confidence).`,
+          ]);
+        } else {
+          setMissionLogs((prev) => [
+            ...prev,
+            `[AEF] ⚠️ ${agent.name} returned non-fatal error: ${execResult.error?.message}`,
+          ]);
+        }
+
+        currentPct += stepPct;
+        setMissionProgress(Math.min(Math.round(currentPct), 90));
+      }
+
+      setMissionProgress(100);
+      setMissionLogs((prev) => [...prev, `[AEF] Mission complete! Aggregated findings into Final Mission Report.`]);
+
+      const report = {
+        missionId,
+        presetId: preset.id,
+        presetName: preset.name,
+        timestamp: new Date().toISOString(),
+        agentsExecuted: agentIds,
+        results,
+        evidence: Object.values(results).flatMap((r: any) => r.evidence || []),
+        recommendations: Object.values(results).flatMap((r: any) => r.recommendations || []),
+      };
+
+      setMissionReport(report);
+    } catch (err: any) {
+      setMissionLogs((prev) => [...prev, `[AEF] ❌ Mission failed: ${err.message}`]);
+    } finally {
+      setIsMissionRunning(false);
     }
   };
 
@@ -339,29 +472,51 @@ export function SoftwareIntelligenceWorkspace() {
 
           <div className="h-px bg-border" />
 
-          {/* Custom File Upload */}
+          {/* Local Repository / File Ingestion */}
           <div className="space-y-3">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Upload Custom Source
+              Import Local Repository
             </label>
-            <div className="flex items-center justify-center w-full">
-              <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-background hover:bg-muted/30 transition-all border-muted-foreground/30">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <Upload className="size-5 text-muted-foreground mb-1" />
-                  <p className="text-[11px] text-muted-foreground">Select source code files</p>
-                </div>
-                <input
-                  type="file"
-                  multiple
-                  className="hidden"
-                  onChange={handleCustomFileUpload}
-                  disabled={store.importStatus === 'importing'}
-                />
-              </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => folderInputRef.current?.click()}
+                disabled={store.importStatus === 'importing'}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border bg-background px-3 py-2.5 text-xs font-semibold hover:bg-muted/50 transition-all text-primary border-primary/30"
+              >
+                <FolderUp className="size-4" />
+                Upload Folder
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={store.importStatus === 'importing'}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border bg-background px-3 py-2.5 text-xs font-semibold hover:bg-muted/50 transition-all text-foreground"
+              >
+                <Upload className="size-4" />
+                Upload Files
+              </button>
             </div>
+
+            <input
+              ref={folderInputRef}
+              type="file"
+              className="hidden"
+              // @ts-expect-error webkitdirectory is standard in Chromium/Firefox
+              webkitdirectory=""
+              directory=""
+              multiple
+              onChange={handleDirectoryUpload}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              multiple
+              onChange={handleDirectoryUpload}
+            />
+
             {customFileCount > 0 && store.activeProjectId === 'custom' && (
-              <p className="text-[10px] text-primary text-center">
-                Ingested {customFileCount} files successfully.
+              <p className="text-[10px] text-primary text-center font-mono">
+                ✓ Ingested {customFileCount} files successfully into PIM digital twin.
               </p>
             )}
           </div>
@@ -377,7 +532,6 @@ export function SoftwareIntelligenceWorkspace() {
               )}
             </div>
 
-            {/* Progress Bar */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
                 <span>{store.importStatus.toUpperCase()}</span>
@@ -391,7 +545,6 @@ export function SoftwareIntelligenceWorkspace() {
               </div>
             </div>
 
-            {/* Terminal Console Logs */}
             <div className="relative rounded-lg bg-zinc-950 p-3 font-mono text-[9px] leading-relaxed text-zinc-400 border border-zinc-800">
               <div className="h-44 overflow-y-auto space-y-1.5 scrollbar-thin">
                 {store.importLogs.map((log, idx) => {
@@ -414,7 +567,7 @@ export function SoftwareIntelligenceWorkspace() {
         </div>
       </div>
 
-      {/* ── Center Column: Ontology Explorer & Capability Map ── */}
+      {/* ── Center Column: Ontology Explorer, Capability Map & Autonomous Missions ── */}
       <div className="flex flex-1 flex-col min-w-0 border-r">
         <div className="flex h-12 items-center justify-between border-b px-4 shrink-0 bg-background/50 backdrop-blur">
           <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-0.5 text-xs font-medium">
@@ -434,16 +587,39 @@ export function SoftwareIntelligenceWorkspace() {
             >
               Capability Map
             </button>
+            <button
+              onClick={() => setCenterTab('missions')}
+              className={`rounded-md px-3 py-1 transition-all flex items-center gap-1.5 ${
+                centerTab === 'missions' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Cpu className="size-3 text-primary" />
+              Missions
+            </button>
           </div>
 
           {store.pim && (
-            <button
-              onClick={handleGenerateDiagram}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow transition-all hover:bg-primary/95"
-            >
-              <Sparkles className="size-3.5" />
-              Generate Diagram
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedViewType}
+                onChange={(e) => setSelectedViewType(e.target.value as DiagramViewType)}
+                className="rounded-lg border bg-background px-2.5 py-1 text-xs outline-none text-foreground font-medium"
+              >
+                <option value="architecture">Architecture View</option>
+                <option value="c4-container">C4 Container</option>
+                <option value="component">Component View</option>
+                <option value="dependencies">Dependency Graph</option>
+                <option value="erd">Entity Relation (ERD)</option>
+                <option value="api">API Endpoints</option>
+              </select>
+              <button
+                onClick={handleGenerateDiagram}
+                className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow transition-all hover:bg-primary/95"
+              >
+                <Sparkles className="size-3.5" />
+                Generate Diagram
+              </button>
+            </div>
           )}
         </div>
 
@@ -484,7 +660,6 @@ export function SoftwareIntelligenceWorkspace() {
                           isExpanded ? 'border-primary bg-primary/5' : 'bg-background hover:border-muted-foreground/30'
                         }`}
                       >
-                        {/* Header */}
                         <div
                           onClick={() => setExpandedEntity(isExpanded ? null : entity.id)}
                           className="flex cursor-pointer items-center justify-between p-4"
@@ -503,14 +678,12 @@ export function SoftwareIntelligenceWorkspace() {
                           {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                         </div>
 
-                        {/* Details */}
                         {isExpanded && (
                           <div className="border-t px-4 py-3 space-y-3 text-xs leading-normal">
                             {entity.description && (
                               <p className="text-muted-foreground leading-relaxed">{entity.description}</p>
                             )}
 
-                            {/* Attributes */}
                             {Object.keys(entity.attributes).length > 0 && (
                               <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/40 p-3">
                                 {Object.entries(entity.attributes).map(([k, v]) => (
@@ -522,7 +695,6 @@ export function SoftwareIntelligenceWorkspace() {
                               </div>
                             )}
 
-                            {/* Evidence Citations */}
                             <div className="space-y-2">
                               <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
                                 Grounded Evidence List
@@ -553,7 +725,7 @@ export function SoftwareIntelligenceWorkspace() {
                 )}
               </div>
             </div>
-          ) : (
+          ) : centerTab === 'map' ? (
             // Capability Map & Dependency Viewer
             <div className="space-y-6">
               <div className="flex items-center gap-2 rounded-xl bg-primary/5 p-4 border border-primary/20 text-xs">
@@ -579,55 +751,34 @@ export function SoftwareIntelligenceWorkspace() {
                         isHovered
                           ? 'border-primary bg-primary/5 shadow-md scale-[1.01]'
                           : isImpacted
-                          ? 'border-red-500/50 bg-red-500/5 shadow-inner'
-                          : 'bg-background'
+                          ? 'border-amber-500/50 bg-amber-500/10'
+                          : 'bg-background hover:border-muted-foreground/30'
                       }`}
                     >
-                      {isImpacted && (
-                        <div className="absolute top-2 right-2 flex items-center gap-1 rounded bg-red-500/10 px-1.5 py-0.5 text-[8px] font-semibold text-red-500 uppercase tracking-wider font-mono">
-                          <ShieldAlert className="size-2.5" />
-                          Impacted Node
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                            {entity.ontologyType}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-primary">
+                            {(entity.confidence * 100).toFixed(0)}%
+                          </span>
                         </div>
-                      )}
-
-                      <div className="space-y-1">
-                        <span className="text-[9px] font-mono text-muted-foreground uppercase">
-                          {entity.ontologyType}
-                        </span>
-                        <h4 className="font-bold text-sm text-foreground">{entity.name}</h4>
+                        <h4 className="font-bold text-sm mt-1">{entity.name}</h4>
                         {entity.description && (
-                          <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                            {entity.description}
-                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{entity.description}</p>
                         )}
                       </div>
 
-                      {/* Outgoing relationships list */}
-                      {store.pim && (
-                        <div className="mt-4 pt-3 border-t border-dashed space-y-1.5">
-                          <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">
-                            Dependencies:
-                          </span>
-                          <div className="flex flex-wrap gap-1">
-                            {store.pim
-                              .relations()
-                              .filter((r) => r.source === entity.id)
-                              .map((r) => {
-                                const targetName = store.pim?.getEntity(r.target)?.name || r.target;
-                                return (
-                                  <span
-                                    key={r.id}
-                                    className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[9px] font-mono"
-                                  >
-                                    {r.kind === 'dependsOn' ? 'uses' : r.kind}
-                                    <ArrowRight className="size-2 text-muted-foreground" />
-                                    {targetName}
-                                  </span>
-                                );
-                              })}
-                            {store.pim.relations().filter((r) => r.source === entity.id).length === 0 && (
-                              <span className="text-[10px] text-muted-foreground italic">None (Leaf component)</span>
-                            )}
+                      {isHovered && blastRadiusIds.length > 0 && (
+                        <div className="mt-3 border-t pt-2 text-[10px] text-muted-foreground font-mono">
+                          <span className="font-bold text-primary">Blast Radius Impact:</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {blastRadiusIds.map((id) => (
+                              <span key={id} className="rounded bg-muted px-1.5 py-0.5">
+                                {id}
+                              </span>
+                            ))}
                           </div>
                         </div>
                       )}
@@ -635,6 +786,163 @@ export function SoftwareIntelligenceWorkspace() {
                   );
                 })}
               </div>
+            </div>
+          ) : (
+            // Autonomous Engineering Missions
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <Cpu className="size-5 text-primary" />
+                  Autonomous AI Engineering Missions
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Launch specialist agent teams across your repository to reverse-engineer architecture, audit security, review code quality, and generate system documentation.
+                </p>
+              </div>
+
+              {/* Mission Launch Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                {MISSION_PRESETS.map((preset) => {
+                  const Icon = preset.icon;
+                  const isRunning = isMissionRunning && activeMissionId === preset.id;
+
+                  return (
+                    <div
+                      key={preset.id}
+                      className="rounded-xl border bg-background p-4 flex flex-col justify-between gap-4 hover:border-primary/40 transition-all shadow-sm"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                              <Icon className="size-4" />
+                            </div>
+                            <h4 className="font-bold text-xs">{preset.name}</h4>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          {preset.description}
+                        </p>
+                        <div className="flex flex-wrap gap-1 mt-3">
+                          {preset.agents.map((ag) => (
+                            <span key={ag} className="text-[9px] font-mono rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
+                              {ag.replace('-agent', '')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleRunMission(preset)}
+                        disabled={isMissionRunning}
+                        className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow transition-all hover:bg-primary/95 disabled:opacity-50"
+                      >
+                        {isRunning ? (
+                          <>
+                            <RefreshCw className="size-3.5 animate-spin" />
+                            Executing Mission ({missionProgress}%)...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="size-3.5" />
+                            Launch Mission
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Mission Execution Console */}
+              {(isMissionRunning || missionLogs.length > 0) && (
+                <div className="rounded-xl border bg-zinc-950 p-4 font-mono text-[10px] text-zinc-300 space-y-3">
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                    <span className="font-bold text-primary flex items-center gap-2">
+                      <Terminal className="size-3.5" />
+                      Mission Execution Stream
+                    </span>
+                    <span className="text-zinc-500">{missionProgress}% Completed</span>
+                  </div>
+
+                  <div className="h-32 overflow-y-auto space-y-1.5 scrollbar-thin">
+                    {missionLogs.map((log, idx) => (
+                      <div key={idx} className={log.includes('✓') ? 'text-emerald-400 font-bold' : log.includes('❌') ? 'text-red-400' : 'text-zinc-300'}>
+                        {log}
+                      </div>
+                    ))}
+                    <div ref={missionLogsEndRef} />
+                  </div>
+                </div>
+              )}
+
+              {/* Final Mission Report Viewer */}
+              {missionReport && (
+                <div className="rounded-xl border bg-muted/10 p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b pb-3">
+                    <div>
+                      <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                        <CheckCircle2 className="size-4 text-emerald-500" />
+                        Final Mission Report: {missionReport.presetName}
+                      </h4>
+                      <p className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                        Mission ID: {missionReport.missionId} · Generated: {new Date(missionReport.timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const blob = new Blob([JSON.stringify(missionReport, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${missionReport.presetId}-report.json`;
+                        a.click();
+                      }}
+                      className="flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted transition-all"
+                    >
+                      <Download className="size-3.5" />
+                      Export Report
+                    </button>
+                  </div>
+
+                  {/* Recommendations */}
+                  {missionReport.recommendations?.length > 0 && (
+                    <div className="rounded-lg bg-background border p-4 space-y-2">
+                      <span className="text-xs font-bold text-primary uppercase tracking-wider">
+                        Actionable Recommendations ({missionReport.recommendations.length}):
+                      </span>
+                      <ul className="list-disc list-inside text-xs space-y-1 text-muted-foreground">
+                        {missionReport.recommendations.map((rec: string, idx: number) => (
+                          <li key={idx} className="leading-relaxed">{rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Specialist Agent Outputs */}
+                  <div className="space-y-3">
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Specialist Agent Findings
+                    </span>
+                    <div className="grid grid-cols-1 gap-3">
+                      {Object.entries(missionReport.results).map(([agentId, result]: [string, any]) => (
+                        <div key={agentId} className="rounded-lg border bg-background p-3.5 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-primary font-mono">{agentId}</span>
+                            <span className="text-[10px] font-mono bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                              Confidence: {((result.confidence || 0.95) * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <pre className="rounded bg-muted/40 p-2.5 font-mono text-[10px] overflow-x-auto leading-relaxed text-foreground max-h-48">
+                            {JSON.stringify(result.data, null, 2)}
+                          </pre>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -665,7 +973,6 @@ export function SoftwareIntelligenceWorkspace() {
 
         {rightTab === 'chat' ? (
           <div className="flex flex-1 flex-col min-h-0 bg-background">
-            {/* Conversation Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {chatHistory.length === 0 && (
                 <div className="flex h-full flex-col items-center justify-center text-center p-6 text-muted-foreground">
@@ -691,7 +998,6 @@ export function SoftwareIntelligenceWorkspace() {
                     <Markdown content={msg.content} />
                   </div>
 
-                  {/* Grounded Evidence citation inside chat bubble */}
                   {msg.evidence && msg.evidence.length > 0 && (
                     <div className="w-[85%] border rounded-lg p-2.5 bg-muted/20 text-[10px] space-y-1.5 font-mono">
                       <span className="font-bold text-muted-foreground text-[8px] uppercase tracking-wider flex items-center gap-1">
@@ -709,45 +1015,15 @@ export function SoftwareIntelligenceWorkspace() {
                 </div>
               ))}
 
-              {/* In-progress stage timeline animation */}
-              {isGeneratingResponse && activeTimeline.length > 0 && (
-                <div className="flex flex-col gap-2 rounded-xl border bg-muted/20 p-4 animate-pulse">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                    <Cpu className="size-3.5 animate-spin text-primary" />
-                    Executing PIM Exploration Pipeline...
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    {activeTimeline.map((step) => (
-                      <div key={step.stage} className="flex items-center gap-1.5 text-[10px] font-mono">
-                        <div
-                          className={`size-2 rounded-full ${
-                            step.status === 'done'
-                              ? 'bg-emerald-500'
-                              : step.status === 'active'
-                              ? 'bg-primary animate-ping'
-                              : 'bg-muted-foreground/30'
-                          }`}
-                        />
-                        <span
-                          className={
-                            step.status === 'done'
-                              ? 'text-zinc-600 dark:text-zinc-400 line-through'
-                              : step.status === 'active'
-                              ? 'text-foreground font-bold'
-                              : 'text-muted-foreground'
-                          }
-                        >
-                          {step.stage}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+              {isGeneratingResponse && (
+                <div className="flex items-center gap-2 rounded-xl border bg-muted/20 p-3 text-xs font-semibold text-foreground animate-pulse">
+                  <Cpu className="size-4 animate-spin text-primary" />
+                  Reasoning over PIM digital twin...
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input form */}
             <form onSubmit={handleSendMessage} className="border-t p-3 bg-muted/5 flex gap-2">
               <input
                 type="text"
@@ -767,11 +1043,9 @@ export function SoftwareIntelligenceWorkspace() {
             </form>
           </div>
         ) : (
-          // Telemetry and Index
           <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
             <h4 className="font-semibold text-sm">Observability & Performance</h4>
 
-            {/* KPI Cards */}
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-xl border bg-background p-3 flex flex-col justify-between">
                 <div className="flex items-center justify-between text-muted-foreground text-[10px] uppercase font-semibold">
@@ -805,24 +1079,10 @@ export function SoftwareIntelligenceWorkspace() {
               </div>
             </div>
 
-            {/* Evidence Index search */}
             <div className="space-y-3 pt-3 border-t">
               <h5 className="font-bold text-xs">Search Grounded Evidence Index</h5>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Filter codebase declarations..."
-                  className="w-full rounded-lg border bg-background pl-8 pr-3 py-2 text-xs outline-none focus:ring-1 focus:ring-primary focus:border-primary"
-                  onChange={(e) => {
-                    // Filter code evidence from active PIM and render them below
-                  }}
-                />
-              </div>
-
-              {/* Show matching evidence declarations */}
               <div className="rounded-lg border bg-zinc-950 font-mono text-[9px] leading-relaxed text-zinc-400 p-3 h-52 overflow-y-auto space-y-2">
-                {store.pim?.entities().flatMap(e => e.evidence).map((ev, idx) => (
+                {store.pim?.entities().flatMap((e) => e.evidence).map((ev, idx) => (
                   <div key={idx} className="border-b border-zinc-800/60 pb-1.5">
                     <span className="text-primary font-bold">{ev.origin.toUpperCase()} Declaration:</span>
                     <div className="truncate text-zinc-300">{ev.source}</div>
@@ -840,4 +1100,35 @@ export function SoftwareIntelligenceWorkspace() {
     </div>
   );
 }
+
+function generateGroundedPimAnswer(query: string, entities: any[], relations: any[]): string {
+  if (entities.length === 0) {
+    return `### Repository Intelligence Summary
+The query "${query}" was evaluated against the Project Intelligence Model.
+- **Total Entities in Model**: ${entities.length}
+- No direct component match was found for the query keywords. Explore the **Ontology Explorer** to inspect all discovered symbols.`;
+  }
+
+  const entityBullets = entities.map(
+    (e) => `* **${e.name}** (\`${e.kind}\` | \`${e.ontologyType}\`): ${e.description || 'Active component'}`
+  ).join('\n');
+
+  const related = relations.filter((r) => entities.some((e) => e.id === r.source || e.id === r.target));
+  const relBullets = related.length > 0
+    ? related.slice(0, 5).map((r) => `* \`${r.source}\` ${r.kind} \`${r.target}\``).join('\n')
+    : '* No explicit inter-service coupling detected for these components.';
+
+  return `### Project Intelligence Findings for "${query}"
+
+#### Discovered Entities & Subsystems
+${entityBullets}
+
+#### Verified Architectural Relations
+${relBullets}
+
+#### Analysis & Grounding
+All findings are mapped directly from source code ASTs, dependency graphs, and PIM entity models.
+`;
+}
+
 export default SoftwareIntelligenceWorkspace;

@@ -14,7 +14,7 @@
 
 import { ProjectKnowledgeModel, type DocumentRef } from '../knowledge';
 import type { NormalizedAST } from './ast/NormalizedAST';
-import { UIRDocument, astToUIR } from './uir/UIR';
+import { type UIRDocument, astToUIR } from './uir/UIR';
 import { defaultParserRegistry, ParserRegistry } from './parsers';
 import type { ParseResult } from './parsers/types';
 import { buildCodeKnowledgeGraph } from './analysis';

@@ -17,9 +17,10 @@ GOOGLE_API_BASE = "https://generativelanguage.googleapis.com"
 
 
 def get_effective_gemini_key() -> str:
+    if "GEMINI_API_KEY" in os.environ:
+        return os.environ["GEMINI_API_KEY"].strip()
     settings = get_settings()
-    key = settings.gemini_api_key or os.environ.get("GEMINI_API_KEY", "")
-    return key.strip()
+    return (settings.gemini_api_key or "").strip()
 
 
 @router.api_route("/gemini/{path:path}", methods=["GET", "POST"])

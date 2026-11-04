@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { defaultAIConfig, mergeConfig } from '../core/AIConfig';
 
 describe('AIConfig', () => {
-  it('exposes frozen defaults targeting Anthropic', () => {
-    expect(defaultAIConfig.provider).toBe('anthropic');
-    expect(defaultAIConfig.models.default.model).toContain('claude');
+  it('exposes frozen defaults targeting Gemini', () => {
+    expect(defaultAIConfig.provider).toBe('gemini');
+    expect(defaultAIConfig.models.default.model).toContain('gemini');
     expect(Object.isFrozen(defaultAIConfig)).toBe(true);
   });
 
@@ -20,6 +20,6 @@ describe('AIConfig', () => {
 
   it('does not mutate the base config', () => {
     mergeConfig({ provider: 'openai' });
-    expect(defaultAIConfig.provider).toBe('anthropic');
+    expect(defaultAIConfig.provider).toBe('gemini');
   });
 });

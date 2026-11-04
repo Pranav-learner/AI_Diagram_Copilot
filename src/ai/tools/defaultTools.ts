@@ -10,3 +10,4 @@ export function createDefaultToolRegistry(): ToolRegistry {
   registry.register(new ASTInspectTool());
   return registry;
 }
+
