@@ -72,7 +72,10 @@ export class ReferenceResolver {
     const exact = items.filter((e) => normalize(e.label) === norm);
     if (exact.length > 0) return toResolved(exact);
     const contains = items.filter((e) => normalize(e.label).includes(norm));
-    return toResolved(contains);
+    if (contains.length > 0) return toResolved(contains);
+    const semantic = this.bySemanticRole(norm, items);
+    if (semantic.length > 0) return toResolved(semantic);
+    return EMPTY;
   }
 
   private bySelection(index: number | undefined, kind: RefKind): ResolvedReference {
@@ -94,16 +97,69 @@ export class ReferenceResolver {
 
   private byDescriptor(text: string, kind: RefKind): ResolvedReference {
     const tokens = tokenize(text);
-    if (tokens.length === 0) return EMPTY;
     const items = this.collection(kind);
-    const haystack = (e: UnderstoodNode | UnderstoodGroup) =>
-      normalize(`${e.label} ${'role' in e && e.role ? e.role : ''}`);
+    if (tokens.length > 0) {
+      const haystack = (e: UnderstoodNode | UnderstoodGroup) =>
+        normalize(`${e.label} ${'role' in e && e.role ? e.role : ''}`);
 
-    // Prefer items matching ALL tokens; fall back to ANY token.
-    const all = items.filter((e) => tokens.every((t) => haystack(e).includes(t)));
-    if (all.length > 0) return toResolved(all);
-    const any = items.filter((e) => tokens.some((t) => haystack(e).includes(t)));
-    return toResolved(any);
+      // Prefer items matching ALL tokens; fall back to ANY token.
+      const all = items.filter((e) => tokens.every((t) => haystack(e).includes(t)));
+      if (all.length > 0) return toResolved(all);
+      const any = items.filter((e) => tokens.some((t) => haystack(e).includes(t)));
+      if (any.length > 0) return toResolved(any);
+    }
+    const semantic = this.bySemanticRole(normalize(text), items);
+    if (semantic.length > 0) return toResolved(semantic);
+    return EMPTY;
+  }
+
+  private bySemanticRole(
+    norm: string,
+    items: ReadonlyArray<UnderstoodNode | UnderstoodGroup>,
+  ): ReadonlyArray<UnderstoodNode | UnderstoodGroup> {
+    const isDb = norm === 'database' || norm === 'db' || norm === 'storage' || norm === 'sql';
+    const isApi = norm === 'api' || norm === 'gateway' || norm === 'ingress' || norm === 'router' || norm === 'endpoint';
+    const isService = norm === 'service' || norm === 'services' || norm === 'backend';
+    const isCache = norm === 'cache' || norm === 'redis' || norm === 'memcached';
+    const isQueue = norm === 'queue' || norm === 'kafka' || norm === 'rabbitmq';
+
+    if (isDb) {
+      const exactRole = items.filter((e) => 'role' in e && (e.role === 'database' || e.shape === 'cylinder'));
+      if (exactRole.length > 0) return exactRole;
+      return items.filter((e) => {
+        const lbl = normalize(e.label);
+        return lbl.includes('database') || lbl.includes('db') || lbl.includes('repository') || lbl.includes('model') || lbl.includes('sql');
+      });
+    }
+
+    if (isApi) {
+      const exactRole = items.filter((e) => 'role' in e && (e.role === 'gateway' || e.role === 'api'));
+      if (exactRole.length > 0) return exactRole;
+      return items.filter((e) => {
+        const lbl = normalize(e.label);
+        return lbl.includes('api') || lbl.includes('router') || lbl.includes('gateway') || lbl.includes('fastapi') || lbl.includes('controller');
+      });
+    }
+
+    if (isService) {
+      const exactRole = items.filter((e) => 'role' in e && e.role === 'service');
+      if (exactRole.length > 0) return exactRole;
+      return items.filter((e) => normalize(e.label).includes('service'));
+    }
+
+    if (isCache) {
+      const exactRole = items.filter((e) => 'role' in e && e.role === 'cache');
+      if (exactRole.length > 0) return exactRole;
+      return items.filter((e) => normalize(e.label).includes('cache') || normalize(e.label).includes('redis'));
+    }
+
+    if (isQueue) {
+      const exactRole = items.filter((e) => 'role' in e && e.role === 'queue');
+      if (exactRole.length > 0) return exactRole;
+      return items.filter((e) => normalize(e.label).includes('queue') || normalize(e.label).includes('kafka'));
+    }
+
+    return [];
   }
 
   private bySuperlative(metric: SuperlativeMetric, kind: RefKind): ResolvedReference {
@@ -157,7 +213,7 @@ function normalize(text: string): string {
 function tokenize(text: string): string[] {
   return normalize(text)
     .split(/[^a-z0-9]+/)
-    .filter((t) => t.length > 2 && !STOPWORDS.has(t));
+    .filter((t) => t.length >= 2 && !STOPWORDS.has(t));
 }
 
 const STOPWORDS = new Set(['the', 'and', 'all', 'node', 'nodes', 'element', 'elements']);

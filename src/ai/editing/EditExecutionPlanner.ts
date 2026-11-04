@@ -138,7 +138,7 @@ export class EditExecutionPlanner {
         if (!source || !target) break;
         const edges = ctx.edgesBetween(source, target);
         if (edges.length === 0) {
-          ctx.issue(editError('unknown_reference', `No connection between ${ctx.labelOf(source)} and ${ctx.labelOf(target)}`, i));
+          ctx.issue(editWarning('unknown_reference', `No direct connection between ${ctx.labelOf(source)} and ${ctx.labelOf(target)} to disconnect`, i));
           break;
         }
         for (const edgeId of edges) ctx.op('edge.disconnect', { id: edgeId }, 'Disconnect');

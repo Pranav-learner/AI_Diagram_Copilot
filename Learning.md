@@ -12,5 +12,8 @@
 | Distributed Systems | Execution graphs, scheduling, orchestration |
 | Multi-Agent Systems | Specialist agents and agent contracts |
 | AI Infrastructure | Execution framework, observability, resource management |
-| DevOps | Docker, CI/CD, deployment |
+
+Not done
+
+| DevOps | Docker, CI/CD deployment |
 | Platform Engineering | SDK, plugins, integrations, RBAC |

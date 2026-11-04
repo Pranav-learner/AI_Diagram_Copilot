@@ -75,4 +75,11 @@ describe('ReferenceResolver', () => {
     const r = new ReferenceResolver(understanding(doc));
     expect(r.resolve({ by: 'label', label: 'Kafka' }, 'node').ids).toEqual([]);
   });
+
+  it('resolves semantic role aliases (API, Database, DB)', () => {
+    const r = new ReferenceResolver(understanding(doc));
+    // In doc, ids.db has role 'database' or label 'Database'
+    expect(r.resolve({ by: 'label', label: 'Database' }, 'node').ids).toEqual([ids.db]);
+    expect(r.resolve({ by: 'descriptor', text: 'db' }, 'node').ids).toEqual([ids.db]);
+  });
 });
